@@ -60,21 +60,21 @@
 .brand-box {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  justify-content: center;
+  margin-bottom: 0.35rem;
 }
 
-.brand-icon {
-  font-size: 2rem;
+.auth-logo-img {
+  height: 44px;
+  width: auto;
+  max-width: 240px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 14px rgba(168, 85, 247, 0.3));
+  transition: transform 0.2s ease;
 }
 
-.brand-title {
-  margin: 0;
-  font-size: 2rem;
-  font-weight: 900;
-  letter-spacing: -0.03em;
-  background: linear-gradient(135deg, #a855f7 0%, #38bdf8 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+.auth-logo-img:hover {
+  transform: scale(1.02);
 }
 
 .auth-subtitle {
@@ -181,12 +181,33 @@
   transition: all 0.2s ease;
   outline: none;
   font-family: inherit;
+  color-scheme: dark;
 }
 
 .input-wrap input:focus {
   border-color: #a855f7;
   box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.2);
   background: #0e1526;
+  color: #ffffff;
+}
+
+/* Evitar que el autocompletado del navegador ponga el fondo blanco */
+.input-wrap input:-webkit-autofill,
+.input-wrap input:-webkit-autofill:hover, 
+.input-wrap input:-webkit-autofill:focus, 
+.input-wrap input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #090e1a inset !important;
+  box-shadow: 0 0 0 1000px #090e1a inset !important;
+  -webkit-text-fill-color: #f8fafc !important;
+  color: #f8fafc !important;
+  caret-color: #f8fafc !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+.input-wrap input:focus:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px #0e1526 inset, 0 0 0 3px rgba(168, 85, 247, 0.2) !important;
+  box-shadow: 0 0 0 1000px #0e1526 inset, 0 0 0 3px rgba(168, 85, 247, 0.2) !important;
+  -webkit-text-fill-color: #ffffff !important;
 }
 
 .input-wrap input::placeholder {

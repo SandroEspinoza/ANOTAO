@@ -5,8 +5,11 @@
     <!-- Header de la App -->
     <header class="auth-header">
       <div class="brand-box">
-        <span class="brand-icon">💰</span>
-        <h1 class="brand-title">ANOTAO</h1>
+        <img 
+          src="/Anotao_negro_crop.png" 
+          alt="ANOTAO" 
+          class="auth-logo-img"
+          onerror="this.src='/Anotao_negro.png'">
       </div>
       <p class="auth-subtitle">
         {{ esRegistro() ? 'Crea tu cuenta privada para gestionar tus préstamos' : 'Tu cartera de préstamos e intereses, 100% segura' }}

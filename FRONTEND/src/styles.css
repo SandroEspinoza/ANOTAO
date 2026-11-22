@@ -1,5 +1,6 @@
 /* Estilos Globales - Tema Oscuro y Optimización Móvil para ANOTAO */
 :root {
+  color-scheme: dark;
   --bg-app: #090d16;
   --bg-shell: #0d121f;
   --bg-surface: #111827;
