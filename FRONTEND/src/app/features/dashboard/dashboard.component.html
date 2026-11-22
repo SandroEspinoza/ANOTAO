@@ -1,0 +1,383 @@
+<section class="dashboard-responsive">
+  <!-- Estado de carga inicial -->
+  <div *ngIf="cargandoDatos() && !loanService.resumen()" class="archive-loading" style="padding: 4rem 1rem;">
+    <div class="spinner"></div>
+    <p>Cargando información y métricas de resumen...</p>
+  </div>
+
+  <!-- Fila Superior de Métricas -->
+  <div class="metrics-grid" *ngIf="loanService.resumen() as res">
+    <!-- Tarjeta Hero Saldo Pendiente -->
+    <div class="hero-debt-card">
+      <span class="hero-badge">⏳ Saldo por Cobrar</span>
+      <h2 class="hero-amount">S/ {{ res.total_pendiente | number:'1.2-2' }}</h2>
+      <p class="hero-sub">{{ res.cantidad_pendientes }} personas con deuda pendiente</p>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-header">
+        <span class="icon">💰</span>
+        <span class="label">Total Prestado</span>
+      </div>
+      <span class="metric-value">S/ {{ res.total_prestado | number:'1.2-2' }}</span>
+      <span class="metric-footnote">{{ res.cantidad_prestamos }} préstamos registrados</span>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-header">
+        <span class="icon">✅</span>
+        <span class="label">Total Cobrado</span>
+      </div>
+      <span class="metric-value text-success">S/ {{ res.total_cobrado | number:'1.2-2' }}</span>
+      <span class="metric-footnote">{{ res.cantidad_pagados }} préstamos cancelados</span>
+    </div>
+
+    <div class="metric-card highlight-interest">
+      <div class="metric-header">
+        <span class="icon">📈</span>
+        <span class="label">Intereses Cobrados</span>
+      </div>
+      <span class="metric-value text-purple">S/ {{ res.total_intereses_cobrados | number:'1.2-2' }}</span>
+      <span class="metric-footnote">Ganancia neta acumulada</span>
+    </div>
+  </div>
+
+  <!-- Barra de Estado de Cartera -->
+  <div class="recovery-card" *ngIf="loanService.resumen() as res">
+    <div class="recovery-header">
+      <div>
+        <h4>Recuperación de Capital</h4>
+        <small class="sub-text">Porcentaje total recuperado respecto al capital prestado</small>
+      </div>
+      <span class="recovery-rate">
+        {{ calcularTasa(res.total_cobrado, res.total_prestado) | number:'1.1-1' }}%
+      </span>
+    </div>
+    
+    <div class="progress-bar">
+      <div 
+        class="progress-fill" 
+        [style.width.%]="calcularTasa(res.total_cobrado, res.total_prestado)">
+      </div>
+    </div>
+
+    <div class="stats-pills">
+      <div class="pill pill-debt clickable-pill" (click)="irAPrestamos.emit()" title="Ver deudores activos en Préstamos">
+        <span>🔴 Deudores activos: <strong>{{ res.cantidad_pendientes }}</strong></span>
+        <span class="pill-nav-icon">➔</span>
+      </div>
+      <div class="pill pill-paid" (click)="filtroVista.set('PAGADO')" title="Ver préstamos cancelados">
+        <span>🟢 Préstamos cancelados: <strong>{{ res.cantidad_pagados }}</strong></span>
+      </div>
+      <div class="pill pill-total" (click)="filtroVista.set('TODOS')" title="Ver todos los préstamos">
+        <span>📋 Total préstamos registrados: <strong>{{ res.cantidad_prestamos }}</strong></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECCIÓN DE RESUMEN Y CONTROL DE PRÉSTAMOS -->
+  <div class="history-archive-section">
+    <div class="archive-header">
+      <div class="archive-title-box">
+        <div class="title-with-badge">
+          <h3>🏛️ Resumen y Control de Préstamos</h3>
+          <span class="badge-archive-count">{{ listaFiltrada().length }}</span>
+        </div>
+        <p class="archive-subtitle">
+          Consulta el historial de préstamos cancelados, deudores activos y el seguimiento de pagos de cada mes.
+        </p>
+      </div>
+
+      <!-- Buscador en Historial -->
+      <div class="archive-search-box">
+        <span class="search-icon">🔍</span>
+        <input 
+          type="text" 
+          [(ngModel)]="busquedaHistorial" 
+          placeholder="Buscar persona o teléfono..." 
+          class="archive-search-input">
+      </div>
+    </div>
+
+    <!-- Pestañas de Filtro: Cancelados, Activos, Todos -->
+    <div class="summary-tabs-bar">
+      <button 
+        type="button"
+        class="s-tab" 
+        [class.active]="filtroVista() === 'PAGADO'" 
+        (click)="filtroVista.set('PAGADO')">
+        🏛️ Cancelados / Historial ({{ prestamosCancelados().length }})
+      </button>
+      <button 
+        type="button"
+        class="s-tab" 
+        [class.active]="filtroVista() === 'PENDIENTE'" 
+        (click)="filtroVista.set('PENDIENTE')">
+        ⏳ Activos / Por Cobrar ({{ prestamosActivos().length }})
+      </button>
+      <button 
+        type="button"
+        class="s-tab" 
+        [class.active]="filtroVista() === 'TODOS'" 
+        (click)="filtroVista.set('TODOS')">
+        📋 Todos los Préstamos ({{ todosPrestamos().length }})
+      </button>
+    </div>
+
+    <!-- Estado de Carga -->
+    <div *ngIf="cargandoDatos()" class="archive-loading">
+      <div class="spinner"></div>
+      <p>Cargando información de préstamos...</p>
+    </div>
+
+    <!-- Estado Vacío -->
+    <div *ngIf="!cargandoDatos() && listaFiltrada().length === 0" class="archive-empty">
+      <div class="empty-icon-wrap">📋</div>
+      <h4>{{ todosPrestamos().length === 0 ? 'Aún no hay préstamos registrados' : 'No se encontraron coincidencias' }}</h4>
+      <p *ngIf="todosPrestamos().length === 0">
+        Cuando anotes un préstamo o liquides una deuda, aparecerá aquí con todo su resumen contable y fechas de pago.
+      </p>
+      <p *ngIf="todosPrestamos().length > 0">
+        No hay registros en esta vista que coincidan con "{{ busquedaHistorial() }}".
+      </p>
+    </div>
+
+    <!-- Grid de Préstamos -->
+    <div class="archive-grid" *ngIf="!cargandoDatos() && listaFiltrada().length > 0">
+      <div *ngFor="let p of listaFiltrada()" class="archive-card" [class.archive-card-pending]="p.estado !== 'PAGADO'">
+        <!-- Top del Card -->
+        <div class="archive-card-top">
+          <div class="client-group">
+            <span class="avatar" [class.avatar-paid]="p.estado === 'PAGADO'">{{ obtenerInicial(p.cliente) }}</span>
+            <div class="client-text">
+              <h4 class="client-name">{{ p.cliente }}</h4>
+              <!-- Teléfono y WhatsApp: Sólo disponible para préstamos activos/pendientes -->
+              <div class="contact-links" *ngIf="p.telefono">
+                <button 
+                  *ngIf="p.estado !== 'PAGADO'"
+                  type="button" 
+                  class="wsp-badge-btn" 
+                  [class.wsp-covered-btn]="estaMesCubierto(p)"
+                  (click)="abrirModalWhatsApp(p, estaMesCubierto(p) ? 'COMPROBANTE' : 'RECORDATORIO')" 
+                  [title]="estaMesCubierto(p) ? 'Mes cubierto y al día. Enviar recibo de pago' : 'Enviar WhatsApp'">
+                  💬 {{ p.telefono }} <span class="badge-tag" *ngIf="estaMesCubierto(p)">• Recibo</span>
+                </button>
+                <span *ngIf="p.estado === 'PAGADO'" class="phone-static">
+                  📱 {{ p.telefono }}
+                </span>
+                <a [href]="'tel:' + p.telefono" class="phone-link" title="Llamar">
+                  📞
+                </a>
+              </div>
+              <button 
+                *ngIf="!p.telefono && p.estado !== 'PAGADO'" 
+                type="button" 
+                class="no-phone-wsp-btn" 
+                [class.wsp-covered-btn]="estaMesCubierto(p)"
+                (click)="abrirModalWhatsApp(p, estaMesCubierto(p) ? 'COMPROBANTE' : 'RECORDATORIO')" 
+                [title]="estaMesCubierto(p) ? 'Mes cubierto y al día. Enviar recibo de pago' : 'Enviar mensaje de WhatsApp'">
+                💬 {{ estaMesCubierto(p) ? 'Enviar Recibo' : 'Enviar WhatsApp' }}
+              </button>
+            </div>
+          </div>
+
+          <div class="status-and-plan">
+            <span class="plan-pill" [class.plan-meses]="p.modalidad === 'A_MESES'">
+              {{ p.modalidad === 'A_MESES' ? ('🗓️ A ' + p.plazo_meses + ' meses') : ('📅 Int. ' + p.interes_porcentaje + '%') }}
+            </span>
+            <span class="badge-completed" *ngIf="p.estado === 'PAGADO'">
+              ✅ CANCELADO
+            </span>
+            <span class="badge-pending-res" *ngIf="p.estado !== 'PAGADO'">
+              ⏳ POR COBRAR
+            </span>
+          </div>
+        </div>
+
+        <!-- Barra de Fechas: Inicio y Próximo / Cancelación -->
+        <div class="archive-dates-bar">
+          <div class="c-date-item">
+            <span class="c-date-lbl">📅 Otorgado:</span>
+            <span class="c-date-val">{{ p.fecha_prestamo | date:'dd/MM/yyyy' }}</span>
+          </div>
+          <div class="c-date-item" *ngIf="p.estado === 'PAGADO'">
+            <span class="c-date-lbl">🏁 Cancelado el:</span>
+            <span class="c-date-val highlight-paid">{{ (p.fecha_ultimo_pago || p.fecha_prestamo) | date:'dd/MM/yyyy' }}</span>
+          </div>
+          <div class="c-date-item" *ngIf="p.estado !== 'PAGADO' && p.fecha_proximo_pago">
+            <span class="c-date-lbl">⏳ Próximo cobro:</span>
+            <span class="c-date-val text-accent">{{ p.fecha_proximo_pago | date:'dd/MM/yyyy' }}</span>
+            <small class="c-date-hint">(Día {{ p.dia_pago_mes }})</small>
+          </div>
+          <div class="c-date-item" *ngIf="p.meses_pagados > 0">
+            <span class="c-date-lbl">✅ Pagados:</span>
+            <span class="c-date-val text-success">{{ p.meses_pagados }} mes{{ p.meses_pagados === 1 ? '' : 'es' }}</span>
+          </div>
+        </div>
+
+        <!-- Desglose Financiero -->
+        <div class="archive-stats-row">
+          <div class="stat-col">
+            <span class="stat-label">Capital Prestado</span>
+            <span class="stat-val">S/ {{ p.monto_prestado | number:'1.2-2' }}</span>
+          </div>
+
+          <div class="stat-col">
+            <span class="stat-label">Total Recaudado</span>
+            <span class="stat-val text-white">S/ {{ p.monto_pagado | number:'1.2-2' }}</span>
+          </div>
+
+          <div class="stat-col stat-profit">
+            <span class="stat-label">{{ p.estado === 'PAGADO' ? 'Ganancia Intereses' : 'Saldo Pendiente' }}</span>
+            <span class="stat-val" [class.text-emerald]="p.estado === 'PAGADO'" [class.text-debt]="p.estado !== 'PAGADO'">
+              {{ p.estado === 'PAGADO' ? ('+S/ ' + (p.intereses_cobrados | number:'1.2-2')) : ('S/ ' + (p.saldo_pendiente | number:'1.2-2')) }}
+            </span>
+            <small class="profit-badge" *ngIf="p.estado === 'PAGADO'">Rentabilidad</small>
+            <small class="sub-hint text-debt" *ngIf="p.estado !== 'PAGADO'">Por cobrar</small>
+          </div>
+        </div>
+
+        <!-- Botones de Acción -->
+        <div class="archive-card-actions">
+          <button class="btn-view-history" (click)="abrirDetalleHistorial(p)">
+            📜 Movimientos
+          </button>
+          <button class="btn-view-schedule" (click)="abrirCronograma(p)">
+            🗓️ Meses y Pagos
+          </button>
+          <!-- WhatsApp sólo disponible para préstamos pendientes/activos, nunca para cancelados -->
+          <button 
+            *ngIf="p.estado !== 'PAGADO'"
+            class="btn-view-wsp" 
+            [class.wsp-covered-btn]="estaMesCubierto(p)"
+            (click)="abrirModalWhatsApp(p, estaMesCubierto(p) ? 'COMPROBANTE' : 'RECORDATORIO')" 
+            [title]="estaMesCubierto(p) ? 'Enviar recibo de pago por WhatsApp' : 'Enviar mensaje por WhatsApp'">
+            💬 {{ estaMesCubierto(p) ? 'Recibo' : 'WhatsApp' }}
+          </button>
+          <!-- Eliminar del Historial (Requisito explícito del usuario) -->
+          <button 
+            class="btn-delete-archive" 
+            (click)="eliminarPrestamoCancelado(p)" 
+            [title]="p.estado === 'PAGADO' ? 'Eliminar del historial ya cancelados' : 'Eliminar préstamo'">
+            🗑️ Eliminar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL HISTORIAL DE MOVIMIENTOS EN RESUMEN -->
+  <div class="action-modal-backdrop" *ngIf="modalHistorialActivo() && prestamoSeleccionado()" (click)="cerrarDetalleHistorial()">
+    <div class="action-modal-card modal-wide" (click)="$event.stopPropagation()">
+      <header class="am-header">
+        <div class="historial-title">
+          <h4>📜 Historial Completo del Préstamo</h4>
+          <small>{{ prestamoSeleccionado()?.cliente }} • {{ prestamoSeleccionado()?.estado === 'PAGADO' ? 'Cancelado' : 'Activo' }}</small>
+        </div>
+        <button class="am-close" (click)="cerrarDetalleHistorial()">✕</button>
+      </header>
+      <div class="am-body">
+        <div *ngIf="!movimientosCargados().length" class="empty-history">
+          No hay movimientos registrados para este préstamo.
+        </div>
+        <div class="timeline" *ngIf="movimientosCargados().length > 0">
+          <div *ngFor="let m of movimientosCargados()" class="timeline-item">
+            <div class="tl-icon" [ngClass]="getTipoClase(m.tipo)">
+              {{ getTipoIcono(m.tipo) }}
+            </div>
+            <div class="tl-content">
+              <div class="tl-header">
+                <span class="tl-badge" [ngClass]="getTipoClase(m.tipo)">{{ formatearTipo(m.tipo) }}</span>
+                <strong class="tl-monto">S/ {{ m.monto | number:'1.2-2' }}</strong>
+              </div>
+              <p class="tl-detail">{{ m.detalle }}</p>
+              <small class="tl-date">{{ m.fecha | date:'dd/MM/yyyy, hh:mm a' }}</small>
+            </div>
+          </div>
+        </div>
+      </div>
+      <footer class="am-footer am-footer-between">
+        <button class="btn-delete-archive-modal" (click)="eliminarPrestamoCancelado(prestamoSeleccionado()!)">
+          🗑️ Eliminar Préstamo
+        </button>
+        <button class="btn-cancel" (click)="cerrarDetalleHistorial()">Cerrar</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- MODAL CALENDARIO / CRONOGRAMA DE MESES EN RESUMEN -->
+  <div class="action-modal-backdrop" *ngIf="modalCronogramaActivo() && prestamoSeleccionado()" (click)="cerrarCronograma()">
+    <div class="action-modal-card modal-wide dark-schedule-modal" (click)="$event.stopPropagation()">
+      <header class="am-header">
+        <div class="historial-title">
+          <h4>🗓️ Calendario de Pagos por Mes</h4>
+          <small>{{ prestamoSeleccionado()?.cliente }} • Cobro mensual: Día {{ prestamoSeleccionado()?.dia_pago_mes }} de cada mes</small>
+        </div>
+        <button class="am-close" (click)="cerrarCronograma()">✕</button>
+      </header>
+
+      <div class="am-body">
+        <div class="schedule-summary-banner">
+          <div class="ss-item">
+            <span class="ss-lbl">📌 Día de Cobro:</span>
+            <strong class="ss-val">Día {{ prestamoSeleccionado()?.dia_pago_mes }}</strong>
+            <small class="ss-sub">Con ajuste a fin de mes (28/29 feb, 30)</small>
+          </div>
+          <div class="ss-item">
+            <span class="ss-lbl">✅ Meses Pagados:</span>
+            <strong class="ss-val text-success">{{ prestamoSeleccionado()?.meses_pagados }} meses</strong>
+            <small class="ss-sub">S/ {{ prestamoSeleccionado()?.monto_pagado | number:'1.2-2' }} cobrado</small>
+          </div>
+          <div class="ss-item">
+            <span class="ss-lbl">📋 Estado:</span>
+            <strong class="ss-val" [class.text-success]="prestamoSeleccionado()?.estado === 'PAGADO'" [class.text-accent]="prestamoSeleccionado()?.estado !== 'PAGADO'">
+              {{ prestamoSeleccionado()?.estado === 'PAGADO' ? '✅ Cancelado' : '⏳ Pendiente' }}
+            </strong>
+            <small class="ss-sub">Saldo: S/ {{ prestamoSeleccionado()?.saldo_pendiente | number:'1.2-2' }}</small>
+          </div>
+        </div>
+
+        <div class="schedule-list" *ngIf="prestamoSeleccionado()?.cronograma_meses as lista">
+          <div 
+            *ngFor="let m of lista" 
+            class="schedule-row-item" 
+            [ngClass]="'row-' + m.estado.toLowerCase()">
+            <div class="sr-left">
+              <div class="sr-badge" [ngClass]="'badge-' + m.estado.toLowerCase()">
+                <span class="sr-icon">{{ m.estado === 'PAGADO' ? '✅' : (m.estado === 'VENCIDO' ? '🔴' : (m.estado === 'POR_COBRAR' ? '⏳' : '📅')) }}</span>
+                <span>{{ m.estado === 'PAGADO' ? 'PAGADO' : (m.estado === 'VENCIDO' ? 'VENCIDO' : (m.estado === 'POR_COBRAR' ? 'POR COBRAR' : 'PROGRAMADO')) }}</span>
+              </div>
+              <div class="sr-info">
+                <h5 class="sr-month">{{ m.mes_nombre }}</h5>
+                <span class="sr-due">Fecha de cobro: <strong>{{ m.fecha_cobro | date:'dd/MM/yyyy' }}</strong></span>
+                <span *ngIf="m.fecha_pago" class="sr-paid-date">
+                  🕒 Pagado el {{ m.fecha_pago | date:'dd/MM/yyyy, hh:mm a' }}
+                </span>
+                <p *ngIf="m.detalle_pago" class="sr-detail">{{ m.detalle_pago }}</p>
+              </div>
+            </div>
+
+            <div class="sr-right">
+              <span class="sr-amount">S/ {{ m.monto | number:'1.2-2' }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer class="am-footer am-footer-between">
+        <button class="btn-delete-archive-modal" (click)="eliminarPrestamoCancelado(prestamoSeleccionado()!)">
+          🗑️ Eliminar Préstamo
+        </button>
+        <button class="btn-cancel" (click)="cerrarCronograma()">Cerrar</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- MODAL DE MENSAJES DE WHATSAPP CON LAS 3 OPCIONES -->
+  <app-whatsapp-modal
+    *ngIf="modalWhatsAppActivo() && prestamoSeleccionado()"
+    [prestamo]="prestamoSeleccionado()!"
+    [tipoInicial]="tipoWhatsApp()"
+    (cerrar)="cerrarModalWhatsApp()">
+  </app-whatsapp-modal>
+</section>

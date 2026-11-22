@@ -1,0 +1,8 @@
+@echo off
+echo ===================================================
+echo Iniciando Servidor Backend ANOTAO (FastAPI)
+echo ===================================================
+cd /d "%~dp0BACKEND"
+call venv\Scripts\activate.bat
+python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
+pause

@@ -1,0 +1,119 @@
+<div class="action-modal-backdrop" (click)="cerrar.emit()">
+  <div class="action-modal-card wsp-modal-card" (click)="$event.stopPropagation()">
+    <!-- Encabezado del Modal -->
+    <header class="am-header">
+      <div class="historial-title">
+        <h4>💬 Enviar Mensaje por WhatsApp</h4>
+        <small>Destinatario: <strong>{{ prestamo.cliente }}</strong> • Modalidad: {{ prestamo.modalidad === 'A_MESES' ? 'A Cuotas' : 'Interés Mensual' }}</small>
+      </div>
+      <button class="am-close" (click)="cerrar.emit()" title="Cerrar">✕</button>
+    </header>
+
+    <div class="am-body">
+      <!-- Selector de las 3 Opciones -->
+      <div class="wsp-templates-grid">
+        <!-- 1. Recordatorio (Bloqueado si mes cubierto) -->
+        <button 
+          type="button" 
+          class="tpl-btn" 
+          [class.active-tpl]="tipoActual() === 'RECORDATORIO'" 
+          [class.tpl-disabled]="estaMesCubierto()"
+          [disabled]="estaMesCubierto()"
+          (click)="cambiarTipo('RECORDATORIO')"
+          [title]="estaMesCubierto() ? 'Bloqueado: El cliente ya pagó y su mes está cubierto' : 'Recordar cobro próximo'">
+          <span class="tpl-icon">{{ estaMesCubierto() ? '🔒' : '🔔' }}</span>
+          <div class="tpl-text">
+            <strong>Recordatorio</strong>
+            <small>{{ estaMesCubierto() ? 'Mes Cubierto' : 'Cobro Próximo' }}</small>
+          </div>
+        </button>
+
+        <!-- 2. Vencido (Bloqueado si mes cubierto) -->
+        <button 
+          type="button" 
+          class="tpl-btn" 
+          [class.active-tpl]="tipoActual() === 'VENCIDO'" 
+          [class.tpl-disabled]="estaMesCubierto()"
+          [disabled]="estaMesCubierto()"
+          (click)="cambiarTipo('VENCIDO')"
+          [title]="estaMesCubierto() ? 'Bloqueado: El cliente no tiene cuotas vencidas' : 'Avisar cuota vencida'">
+          <span class="tpl-icon">{{ estaMesCubierto() ? '🔒' : '⚠️' }}</span>
+          <div class="tpl-text">
+            <strong>Cuota Vencida</strong>
+            <small>{{ estaMesCubierto() ? 'No Aplica' : 'Aviso de Atraso' }}</small>
+          </div>
+        </button>
+
+        <!-- 3. Comprobante de Pago -->
+        <button 
+          type="button" 
+          class="tpl-btn" 
+          [class.active-tpl]="tipoActual() === 'COMPROBANTE'" 
+          (click)="cambiarTipo('COMPROBANTE')"
+          title="Enviar recibo de pago">
+          <span class="tpl-icon">✅</span>
+          <div class="tpl-text">
+            <strong>Comprobante</strong>
+            <small>Recibo de Pago</small>
+          </div>
+        </button>
+      </div>
+
+      <!-- Banner Informativo cuando el mes está cubierto -->
+      <div *ngIf="estaMesCubierto()" class="wsp-covered-banner">
+        <span class="cb-icon">🛡️</span>
+        <div class="cb-text">
+          <strong>Mes Cubierto y al Día:</strong> Se bloquearon los recordatorios y cobros vencidos porque este cliente ya pagó. Solo está habilitado el envío del <strong>Recibo de Pago</strong>.
+        </div>
+      </div>
+
+      <!-- Campo de Teléfono Celular -->
+      <div class="wsp-phone-row">
+        <label for="wspTel" class="phone-lbl">📱 Número de WhatsApp destino:</label>
+        <div class="phone-input-wrap">
+          <span class="phone-prefix">🇵🇪 +51</span>
+          <input 
+            id="wspTel" 
+            type="tel" 
+            [ngModel]="telefonoDestino()" 
+            (ngModelChange)="telefonoDestino.set($event)"
+            placeholder="987654321" 
+            class="phone-input-clean">
+        </div>
+      </div>
+
+      <div *ngIf="errorTelefono()" class="wsp-error-alert">
+        <span>⚠️ {{ errorTelefono() }}</span>
+      </div>
+
+      <!-- Vista Previa y Edición del Mensaje -->
+      <div class="wsp-preview-box">
+        <div class="preview-header">
+          <span class="preview-title">📝 Mensaje a enviar (puedes editarlo si deseas):</span>
+          <button type="button" class="btn-copy-preview" (click)="copiarTexto()">
+            {{ copiadoExito() ? '✓ ¡Copiado!' : '📋 Copiar' }}
+          </button>
+        </div>
+        <textarea 
+          rows="7" 
+          [ngModel]="mensajeTexto()" 
+          (ngModelChange)="mensajeTexto.set($event)"
+          class="wsp-textarea" 
+          placeholder="Escribe el mensaje...">
+        </textarea>
+        <small class="preview-tip">
+          💡 Al presionar el botón verde se abrirá WhatsApp con este texto y número listos para enviar.
+        </small>
+      </div>
+    </div>
+
+    <!-- Pie del Modal -->
+    <footer class="am-footer am-footer-between">
+      <button type="button" class="btn-cancel" (click)="cerrar.emit()">Cerrar</button>
+
+      <button type="button" class="btn-send-whatsapp" (click)="enviarWhatsApp()">
+        <span class="wsp-send-icon">💬</span> Abrir WhatsApp y Enviar
+      </button>
+    </footer>
+  </div>
+</div>

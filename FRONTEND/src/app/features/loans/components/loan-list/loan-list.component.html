@@ -1,0 +1,629 @@
+<div class="loans-screen">
+  <!-- Barra de Filtros y Búsqueda -->
+  <div class="controls-bar">
+    <div class="search-box">
+      <span class="search-icon">🔍</span>
+      <input 
+        type="text" 
+        [(ngModel)]="busqueda" 
+        placeholder="Buscar deudor por nombre o teléfono..." 
+        class="search-input">
+    </div>
+
+    <div class="controls-right">
+      <div class="active-debtors-badge">
+        <span class="pulse-dot"></span>
+        <span>Deudores Activos: <strong>{{ prestamosFiltrados().length }}</strong></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Estado de carga -->
+  <div *ngIf="loanService.cargando()" class="loading-box">
+    <div class="spinner"></div>
+    <p>Cargando información de préstamos...</p>
+  </div>
+
+  <!-- Estado vacío -->
+  <div *ngIf="!loanService.cargando() && prestamosFiltrados().length === 0" class="empty-card">
+    <div class="empty-icon-wrap">📋</div>
+    <h3>No se encontraron préstamos</h3>
+    <p *ngIf="busqueda()">No hay resultados que coincidan con "{{ busqueda() }}".</p>
+    <p *ngIf="!busqueda()">Comienza anotando tu primer préstamo a interés mensual o cuotas.</p>
+    <button class="btn-primary-action" (click)="abrirModal.emit()">
+      ➕ Anotar Nuevo Préstamo
+    </button>
+  </div>
+
+  <!-- Grid de Tarjetas de Préstamos -->
+  <div class="loans-grid" *ngIf="!loanService.cargando() && prestamosFiltrados().length > 0">
+    <div 
+      *ngFor="let p of prestamosFiltrados()" 
+      class="loan-card" 
+      [class.paid-card]="p.estado === 'PAGADO'">
+      
+      <!-- Encabezado de la Tarjeta -->
+      <div class="card-top">
+        <div class="client-group">
+          <span class="avatar">{{ obtenerInicial(p.cliente) }}</span>
+          <div class="client-text">
+            <h4 class="client-name">{{ p.cliente }}</h4>
+            <div class="contact-links" *ngIf="p.telefono">
+              <button 
+                type="button" 
+                class="wsp-badge-btn" 
+                [class.wsp-covered-btn]="estaMesCubierto(p)"
+                (click)="abrirModalWhatsApp(p, estaMesCubierto(p) ? 'COMPROBANTE' : 'RECORDATORIO')" 
+                [title]="estaMesCubierto(p) ? 'Mes cubierto y al día. Enviar recibo de pago' : 'Enviar WhatsApp'">
+                💬 {{ p.telefono }} <span class="badge-tag" *ngIf="estaMesCubierto(p)">• Recibo</span>
+              </button>
+              <a [href]="'tel:' + p.telefono" class="phone-link" title="Llamar">
+                📞
+              </a>
+            </div>
+            <button 
+              *ngIf="!p.telefono" 
+              type="button" 
+              class="no-phone-wsp-btn" 
+              [class.wsp-covered-btn]="estaMesCubierto(p)"
+              (click)="abrirModalWhatsApp(p, estaMesCubierto(p) ? 'COMPROBANTE' : 'RECORDATORIO')" 
+              [title]="estaMesCubierto(p) ? 'Mes cubierto y al día. Enviar recibo de pago' : 'Enviar mensaje de WhatsApp'">
+              💬 {{ estaMesCubierto(p) ? 'Enviar Recibo' : 'Enviar WhatsApp' }}
+            </button>
+          </div>
+        </div>
+
+        <div class="status-and-plan">
+          <span class="plan-pill" [class.plan-meses]="p.modalidad === 'A_MESES'">
+            {{ p.modalidad === 'A_MESES' ? ('🗓️ A ' + p.plazo_meses + ' meses') : ('📅 Int. Mensual') }}
+          </span>
+          <!-- Badge de Estado de Ciclo de Pago -->
+          <span class="cycle-pill" [ngClass]="getEstadoCiclo(p).clase">
+            {{ getEstadoCiclo(p).icono }} {{ getEstadoCiclo(p).texto }}
+          </span>
+        </div>
+      </div>
+
+      <!-- Barra de Fechas del Préstamo -->
+      <div class="card-dates-bar">
+        <div class="c-date-item">
+          <span class="c-date-lbl">📅 Otorgado:</span>
+          <span class="c-date-val">{{ p.fecha_prestamo | date:'dd/MM/yyyy' }}</span>
+        </div>
+        <div class="c-date-item" *ngIf="p.fecha_proximo_pago">
+          <span class="c-date-lbl">⏳ Próximo Cobro:</span>
+          <span class="c-date-val highlight-val">{{ p.fecha_proximo_pago | date:'dd/MM/yyyy' }}</span>
+          <small class="c-date-hint">(Día {{ p.dia_pago_mes }})</small>
+        </div>
+        <div class="c-date-item" *ngIf="p.meses_pagados > 0">
+          <span class="c-date-lbl">✅ Pagado:</span>
+          <span class="c-date-val text-success">{{ p.meses_pagados }} mes{{ p.meses_pagados === 1 ? '' : 'es' }}</span>
+        </div>
+      </div>
+
+      <!-- Cuadrícula Financiera en Soles S/ -->
+      <div class="stats-row">
+        <div class="stat-col">
+          <span class="stat-label">Capital Base</span>
+          <span class="stat-val">S/ {{ p.monto_prestado | number:'1.2-2' }}</span>
+          <small class="rate-badge">{{ p.interes_porcentaje }}% mensual</small>
+        </div>
+
+        <div class="stat-col">
+          <span class="stat-label">{{ p.modalidad === 'A_MESES' ? 'Cuota Mensual' : 'Interés del Mes' }}</span>
+          <span class="stat-val text-accent">S/ {{ p.cuota_mensual | number:'1.2-2' }}</span>
+          <small class="sub-hint" *ngIf="p.modalidad === 'A_MESES'">
+            Cuota {{ p.cuotas_pagadas }}/{{ p.plazo_meses || 1 }}
+          </small>
+          <small class="sub-hint" *ngIf="p.modalidad === 'MENSUAL_LIBRE'">
+            Cada mes
+          </small>
+        </div>
+
+        <div class="stat-col">
+          <span class="stat-label">Total Cobrado</span>
+          <span class="stat-val text-success">S/ {{ p.monto_pagado | number:'1.2-2' }}</span>
+          <small class="sub-hint" *ngIf="p.intereses_cobrados > 0">
+            (S/ {{ p.intereses_cobrados | number:'1.2-2' }} int.)
+          </small>
+        </div>
+
+        <div class="stat-col stat-highlight">
+          <span class="stat-label">Saldo Pendiente</span>
+          <span class="stat-val text-debt">S/ {{ p.saldo_pendiente | number:'1.2-2' }}</span>
+          <small class="sub-hint text-debt" *ngIf="p.saldo_pendiente > 0 && p.modalidad === 'A_MESES'">
+            Total c/int: S/ {{ p.monto_total | number:'1.2-2' }}
+          </small>
+        </div>
+      </div>
+
+      <!-- Barra de Progreso -->
+      <div class="progress-section" *ngIf="p.modalidad === 'A_MESES'">
+        <div class="progress-bar">
+          <div 
+            class="progress-fill" 
+            [style.width.%]="calcularPorcentaje(p.monto_pagado, p.monto_total)">
+          </div>
+        </div>
+        <div class="progress-meta">
+          <span>Pagado: S/ {{ p.monto_pagado | number:'1.2-2' }} de S/ {{ p.monto_total | number:'1.2-2' }}</span>
+          <span><strong>{{ calcularPorcentaje(p.monto_pagado, p.monto_total) }}%</strong></span>
+        </div>
+      </div>
+
+      <!-- Fila de Acciones Rápidas -->
+      <div class="actions-container">
+        <!-- Acción 1: Pagar Interés del Mes o Pagar Cuota -->
+        <button 
+          *ngIf="p.estado !== 'PAGADO' && p.modalidad === 'MENSUAL_LIBRE'" 
+          class="btn-act btn-primary-act" 
+          (click)="abrirModalInteres(p)"
+          title="Registrar pago del interés mensual">
+          📅 Pagar Interés (S/ {{ p.interes_mensual_estimado | number:'1.2-2' }})
+        </button>
+
+        <button 
+          *ngIf="p.estado !== 'PAGADO' && p.modalidad === 'A_MESES'" 
+          class="btn-act btn-primary-act" 
+          (click)="abrirModalCuota(p)"
+          title="Registrar pago de la cuota del mes">
+          📅 Pagar Cuota (S/ {{ p.cuota_mensual | number:'1.2-2' }})
+        </button>
+
+        <div class="actions-grid">
+          <!-- Acción 2: Préstamo sobre Préstamo -->
+          <button 
+            *ngIf="p.estado !== 'PAGADO'" 
+            class="btn-act btn-ampliar" 
+            (click)="abrirModalAmpliar(p)"
+            title="Prestar un monto adicional sobre este préstamo">
+            ➕ Prestar Más
+          </button>
+
+          <!-- Acción 3: Abonar al Capital -->
+          <button 
+            *ngIf="p.estado !== 'PAGADO'" 
+            class="btn-act btn-abono" 
+            (click)="abrirModalAbono(p)"
+            title="Abonar al capital adeudado">
+            💵 Abonar
+          </button>
+
+          <!-- Acción 4: Saldar Todo -->
+          <button 
+            *ngIf="p.estado !== 'PAGADO'" 
+            class="btn-act btn-saldar" 
+            (click)="abrirModalPagarTodo(p)"
+            title="Cancelar totalidad del saldo pendiente">
+            ✅ Pagar Todo
+          </button>
+
+          <!-- Acción 5: Ver Calendario y Meses Pagados -->
+          <button 
+            class="btn-act btn-schedule" 
+            (click)="abrirModalCronograma(p)"
+            title="Ver meses pagados y fechas de cobro">
+            🗓️ Meses
+          </button>
+
+          <!-- Acción 6: Ver Historial / Movimientos -->
+          <button 
+            class="btn-act btn-history" 
+            (click)="abrirModalHistorial(p)"
+            title="Ver historial de pagos y movimientos">
+            📜 Historial
+          </button>
+
+          <!-- Acción 7: Enviar WhatsApp / Recibo -->
+          <button 
+            class="btn-act btn-wsp-action" 
+            [class.wsp-covered-btn]="estaMesCubierto(p)"
+            (click)="abrirModalWhatsApp(p, estaMesCubierto(p) ? 'COMPROBANTE' : 'RECORDATORIO')"
+            [title]="estaMesCubierto(p) ? 'Mes cubierto: Enviar recibo de pago por WhatsApp' : 'Enviar recordatorio o cobranza por WhatsApp'">
+            💬 {{ estaMesCubierto(p) ? 'Recibo' : 'WhatsApp' }}
+          </button>
+
+          <!-- Acción 8: Eliminar -->
+          <button 
+            class="btn-act btn-delete" 
+            title="Eliminar préstamo"
+            (click)="eliminar(p)">
+            🗑️ Eliminar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODALES INTERACTIVOS ================= -->
+
+  <!-- 1. Modal Pagar Interés del Mes -->
+  <div class="action-modal-backdrop" *ngIf="prestamoSeleccionado() && accionActiva() === 'PAGAR_INTERES'" (click)="cerrarModalesAccion()">
+    <div class="action-modal-card" (click)="$event.stopPropagation()">
+      <header class="am-header">
+        <h4>📅 Pagar Interés del Mes</h4>
+        <button class="am-close" (click)="cerrarModalesAccion()">✕</button>
+      </header>
+      <div class="am-body">
+        <p class="am-desc">
+          Cliente: <strong>{{ prestamoSeleccionado()?.cliente }}</strong><br>
+          Interés pactado: <strong>S/ {{ prestamoSeleccionado()?.interes_mensual_estimado | number:'1.2-2' }}</strong> ({{ prestamoSeleccionado()?.interes_porcentaje }}% mensual)
+        </p>
+
+        <!-- Calendario del ciclo y pagos adelantados -->
+        <div class="modal-cycle-box" *ngIf="prestamoSeleccionado()?.fecha_proximo_pago">
+          <div class="cycle-row">
+            <span class="c-lbl">📅 Cobro actual:</span>
+            <strong class="c-val">{{ prestamoSeleccionado()?.fecha_proximo_pago | date:'dd/MM/yyyy' }}</strong>
+          </div>
+          <div class="cycle-row highlight-row">
+            <span class="c-lbl">⚡ Al pagar, avanza al:</span>
+            <strong class="c-val text-accent">{{ calcularProximaFecha(prestamoSeleccionado()?.fecha_proximo_pago) }}</strong>
+          </div>
+          <small class="cycle-hint">💡 Se puede pagar al día o por adelantado. Cada pago extiende la cobertura 1 mes más.</small>
+        </div>
+
+        <div class="form-group">
+          <label for="montoInteresPago">Monto de interés a registrar (S/):</label>
+          <div class="stepper-box">
+            <button type="button" class="step-btn" (click)="montoInteresInput = maxVal(0.5, montoInteresInput - 5)">−</button>
+            <div class="step-input-wrap">
+              <span class="step-prefix">S/</span>
+              <input 
+                id="montoInteresPago" 
+                type="number" 
+                [(ngModel)]="montoInteresInput" 
+                step="0.5" 
+                min="0.5"
+                class="clean-number-input input-pad-prefix">
+            </div>
+            <button type="button" class="step-btn" (click)="montoInteresInput = montoInteresInput + 5">+</button>
+          </div>
+        </div>
+      </div>
+      <footer class="am-footer">
+        <button class="btn-cancel" (click)="cerrarModalesAccion()">Cancelar</button>
+        <button class="btn-confirm" (click)="confirmarPagoInteres()">Confirmar Pago de Interés</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- 2. Modal Pagar Cuota del Mes -->
+  <div class="action-modal-backdrop" *ngIf="prestamoSeleccionado() && accionActiva() === 'PAGAR_CUOTA'" (click)="cerrarModalesAccion()">
+    <div class="action-modal-card" (click)="$event.stopPropagation()">
+      <header class="am-header">
+        <h4>🗓️ Pagar Cuota Mensual</h4>
+        <button class="am-close" (click)="cerrarModalesAccion()">✕</button>
+      </header>
+      <div class="am-body">
+        <p class="am-desc">
+          Cliente: <strong>{{ prestamoSeleccionado()?.cliente }}</strong><br>
+          Cuota programada: <strong>S/ {{ prestamoSeleccionado()?.cuota_mensual | number:'1.2-2' }}</strong><br>
+          Progreso: Cuota {{ (prestamoSeleccionado()?.cuotas_pagadas || 0) + 1 }} de {{ prestamoSeleccionado()?.plazo_meses }} meses
+        </p>
+
+        <div class="modal-cycle-box" *ngIf="prestamoSeleccionado()?.fecha_proximo_pago">
+          <div class="cycle-row">
+            <span class="c-lbl">📅 Cuota del período:</span>
+            <strong class="c-val">{{ prestamoSeleccionado()?.fecha_proximo_pago | date:'dd/MM/yyyy' }}</strong>
+          </div>
+          <div class="cycle-row highlight-row">
+            <span class="c-lbl">⚡ Próxima cuota tras el pago:</span>
+            <strong class="c-val text-accent">{{ calcularProximaFecha(prestamoSeleccionado()?.fecha_proximo_pago) }}</strong>
+          </div>
+        </div>
+
+        <p class="am-info-hint">
+          💡 Al confirmar, se descontará una cuota completa del saldo pendiente y se registrará el avance de fecha.
+        </p>
+      </div>
+      <footer class="am-footer">
+        <button class="btn-cancel" (click)="cerrarModalesAccion()">Cancelar</button>
+        <button class="btn-confirm" (click)="confirmarPagoCuota()">Pagar Cuota (S/ {{ prestamoSeleccionado()?.cuota_mensual | number:'1.2-2' }})</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- 3. Modal Préstamo Sobre Préstamo (Prestar Más) -->
+  <div class="action-modal-backdrop" *ngIf="prestamoSeleccionado() && accionActiva() === 'AMPLIAR'" (click)="cerrarModalesAccion()">
+    <div class="action-modal-card" (click)="$event.stopPropagation()">
+      <header class="am-header">
+        <h4>➕ Préstamo Sobre Préstamo</h4>
+        <button class="am-close" (click)="cerrarModalesAccion()">✕</button>
+      </header>
+      <div class="am-body">
+        <p class="am-desc">
+          Prestar más dinero a <strong>{{ prestamoSeleccionado()?.cliente }}</strong> sobre su préstamo actual.<br>
+          Capital actual: <strong>S/ {{ prestamoSeleccionado()?.monto_prestado | number:'1.2-2' }}</strong> | Saldo: <strong>S/ {{ prestamoSeleccionado()?.saldo_pendiente | number:'1.2-2' }}</strong>
+        </p>
+        <div class="form-group">
+          <label for="montoAmpliar">Monto adicional a prestar (S/):</label>
+          <div class="stepper-box">
+            <button type="button" class="step-btn" (click)="montoAmpliarInput = maxVal(10, montoAmpliarInput - 10)">−</button>
+            <div class="step-input-wrap">
+              <span class="step-prefix">S/</span>
+              <input 
+                id="montoAmpliar" 
+                type="number" 
+                [(ngModel)]="montoAmpliarInput" 
+                placeholder="Ej: 50.00" 
+                min="1" 
+                step="10"
+                class="clean-number-input input-pad-prefix">
+            </div>
+            <button type="button" class="step-btn" (click)="montoAmpliarInput = montoAmpliarInput + 10">+</button>
+          </div>
+        </div>
+
+        <!-- Previsualización en vivo del nuevo cálculo -->
+        <div class="live-calc-ampliar" *ngIf="montoAmpliarInput > 0">
+          <span class="calc-title">Nuevo cálculo sin interés sobre interés:</span>
+          <div class="calc-row">
+            <span>Nuevo Capital Base:</span>
+            <strong>S/ {{ (prestamoSeleccionado()?.monto_prestado || 0) + montoAmpliarInput | number:'1.2-2' }}</strong>
+          </div>
+          <div class="calc-row" *ngIf="prestamoSeleccionado()?.modalidad === 'MENSUAL_LIBRE'">
+            <span>Nuevo Interés Mensual ({{ prestamoSeleccionado()?.interes_porcentaje }}%):</span>
+            <strong class="text-accent">S/ {{ calcularNuevoInteresLibre() | number:'1.2-2' }} / mes</strong>
+          </div>
+          <div class="calc-row" *ngIf="prestamoSeleccionado()?.modalidad === 'A_MESES'">
+            <span>Nueva Cuota Mensual:</span>
+            <strong class="text-accent">S/ {{ calcularNuevaCuotaMeses() | number:'1.2-2' }} / mes</strong>
+          </div>
+        </div>
+
+        <p class="am-info-hint">
+          🛡️ El interés se suma al total pero <strong>no se cobra interés sobre interés</strong>. El nuevo interés se calcula solo sobre el nuevo capital.
+        </p>
+      </div>
+      <footer class="am-footer">
+        <button class="btn-cancel" (click)="cerrarModalesAccion()">Cancelar</button>
+        <button class="btn-confirm" [disabled]="montoAmpliarInput <= 0" (click)="confirmarAmpliacion()">
+          Añadir S/ {{ montoAmpliarInput | number:'1.2-2' }}
+        </button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- 4. Modal Abonar al Capital -->
+  <div class="action-modal-backdrop" *ngIf="prestamoSeleccionado() && accionActiva() === 'ABONAR'" (click)="cerrarModalesAccion()">
+    <div class="action-modal-card" (click)="$event.stopPropagation()">
+      <header class="am-header">
+        <h4>💵 Registrar Abono a Capital</h4>
+        <button class="am-close" (click)="cerrarModalesAccion()">✕</button>
+      </header>
+      <div class="am-body">
+        <p class="am-desc">
+          Cliente: <strong>{{ prestamoSeleccionado()?.cliente }}</strong><br>
+          Capital adeudado actual: <strong>S/ {{ prestamoSeleccionado()?.saldo_pendiente | number:'1.2-2' }}</strong>
+        </p>
+        <div class="form-group">
+          <label for="montoAbono">Monto a amortizar (S/):</label>
+          <div class="stepper-box">
+            <button type="button" class="step-btn" (click)="montoAbonoInput = maxVal(5, montoAbonoInput - 10)">−</button>
+            <div class="step-input-wrap">
+              <span class="step-prefix">S/</span>
+              <input 
+                id="montoAbono" 
+                type="number" 
+                [(ngModel)]="montoAbonoInput" 
+                placeholder="0.00" 
+                min="1" 
+                [max]="prestamoSeleccionado()?.saldo_pendiente || 0"
+                step="10"
+                class="clean-number-input input-pad-prefix">
+            </div>
+            <button type="button" class="step-btn" (click)="montoAbonoInput = minVal(prestamoSeleccionado()?.saldo_pendiente || 0, montoAbonoInput + 10)">+</button>
+          </div>
+        </div>
+
+        <!-- Alerta de validación si el abono supera el saldo adeudado -->
+        <div *ngIf="montoAbonoInput > (prestamoSeleccionado()?.saldo_pendiente || 0)" class="abono-error-banner">
+          ⚠️ <strong>Monto no válido:</strong> No puedes abonar más del capital adeudado actual (S/ {{ prestamoSeleccionado()?.saldo_pendiente | number:'1.2-2' }}). Si el deudor pagará todo, usa <strong>"Pagar Todo"</strong>.
+        </div>
+
+        <!-- Explicación y cálculo en vivo del Abono -->
+        <div class="live-calc-ampliar" *ngIf="montoAbonoInput > 0 && montoAbonoInput <= (prestamoSeleccionado()?.saldo_pendiente || 0)">
+          <span class="calc-title">💡 Efecto del abono en el interés futuro:</span>
+          <div class="calc-row">
+            <span>Nuevo Capital Restante:</span>
+            <strong>S/ {{ calcularNuevoCapitalTrasAbono() | number:'1.2-2' }}</strong>
+          </div>
+          <div class="calc-row" *ngIf="prestamoSeleccionado()?.modalidad === 'MENSUAL_LIBRE'">
+            <span>Nuevo Interés Mensual ({{ prestamoSeleccionado()?.interes_porcentaje }}%):</span>
+            <strong class="text-accent">S/ {{ calcularNuevoInteresTrasAbono() | number:'1.2-2' }} / mes</strong>
+          </div>
+        </div>
+
+        <p class="am-info-hint">
+          🛡️ <strong>El abono descuenta directamente el capital.</strong> A partir de hoy, los futuros intereses mensuales se cobrarán únicamente sobre el saldo que quede restando (sin cobrar interés sobre lo amortizado).
+        </p>
+      </div>
+      <footer class="am-footer">
+        <button class="btn-cancel" (click)="cerrarModalesAccion()">Cancelar</button>
+        <button 
+          class="btn-confirm" 
+          [disabled]="montoAbonoInput <= 0 || montoAbonoInput > (prestamoSeleccionado()?.saldo_pendiente || 0)" 
+          (click)="confirmarAbono()">
+          Aplicar Abono de S/ {{ montoAbonoInput | number:'1.2-2' }}
+        </button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- 5. Modal Confirmar Pagar Todo -->
+  <div class="action-modal-backdrop" *ngIf="prestamoSeleccionado() && accionActiva() === 'PAGAR_TODO'" (click)="cerrarModalesAccion()">
+    <div class="action-modal-card" (click)="$event.stopPropagation()">
+      <header class="am-header">
+        <h4>✅ Cancelar Totalidad del Préstamo</h4>
+        <button class="am-close" (click)="cerrarModalesAccion()">✕</button>
+      </header>
+      <div class="am-body">
+        <p class="am-desc">
+          ¿Confirmas que <strong>{{ prestamoSeleccionado()?.cliente }}</strong> cancelará la totalidad de su saldo pendiente?
+        </p>
+        <div class="pay-all-highlight">
+          <span>Monto final a cancelar:</span>
+          <strong class="pay-all-amount">S/ {{ prestamoSeleccionado()?.saldo_pendiente | number:'1.2-2' }}</strong>
+        </div>
+        <p class="am-info-hint">
+          🏛️ <strong>Importante:</strong> Al marcar como cancelado, este préstamo pasará automáticamente a la sección <strong>Resumen</strong> (Historial de Préstamos Cancelados) para no sobrecargar tu pantalla principal de cobranza.
+        </p>
+      </div>
+      <footer class="am-footer">
+        <button class="btn-cancel" (click)="cerrarModalesAccion()">Cancelar</button>
+        <button class="btn-confirm-success" (click)="confirmarPagarTodo()">
+          Confirmar Cancelación Total
+        </button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- 6. Modal Historial de Movimientos -->
+  <div class="action-modal-backdrop" *ngIf="prestamoSeleccionado() && accionActiva() === 'HISTORIAL'" (click)="cerrarModalesAccion()">
+    <div class="action-modal-card modal-wide" (click)="$event.stopPropagation()">
+      <header class="am-header">
+        <div class="historial-title">
+          <h4>📜 Historial de Movimientos</h4>
+          <small>{{ prestamoSeleccionado()?.cliente }}</small>
+        </div>
+        <button class="am-close" (click)="cerrarModalesAccion()">✕</button>
+      </header>
+      <div class="am-body">
+        <div *ngIf="!movimientosCargados().length" class="empty-history">
+          No hay movimientos registrados para este préstamo.
+        </div>
+        <div class="timeline" *ngIf="movimientosCargados().length > 0">
+          <div *ngFor="let m of movimientosCargados()" class="timeline-item">
+            <div class="tl-icon" [ngClass]="getTipoClase(m.tipo)">
+              {{ getTipoIcono(m.tipo) }}
+            </div>
+            <div class="tl-content">
+              <div class="tl-header">
+                <span class="tl-badge" [ngClass]="getTipoClase(m.tipo)">{{ formatearTipo(m.tipo) }}</span>
+                <strong class="tl-monto">S/ {{ m.monto | number:'1.2-2' }}</strong>
+              </div>
+              <p class="tl-detail">{{ m.detalle }}</p>
+              <small class="tl-date">{{ m.fecha | date:'dd/MM/yyyy, hh:mm a' }}</small>
+            </div>
+          </div>
+        </div>
+      </div>
+      <footer class="am-footer am-footer-between">
+        <button class="btn-delete-archive-modal" (click)="eliminar(prestamoSeleccionado()!)">
+          🗑️ Eliminar Préstamo
+        </button>
+        <button class="btn-cancel" (click)="cerrarModalesAccion()">Cerrar</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- MODAL CALENDARIO / CRONOGRAMA DE MESES PAGADOS -->
+  <div class="action-modal-backdrop" *ngIf="prestamoSeleccionado() && accionActiva() === 'CRONOGRAMA'" (click)="cerrarModalesAccion()">
+    <div class="action-modal-card modal-wide dark-schedule-modal" (click)="$event.stopPropagation()">
+      <header class="am-header">
+        <div class="historial-title">
+          <h4>🗓️ Calendario de Pagos por Mes</h4>
+          <small>{{ prestamoSeleccionado()?.cliente }} • Cobro mensual: Día {{ prestamoSeleccionado()?.dia_pago_mes }}</small>
+        </div>
+        <button class="am-close" (click)="cerrarModalesAccion()">✕</button>
+      </header>
+
+      <div class="am-body">
+        <div class="schedule-summary-banner">
+          <div class="ss-item">
+            <span class="ss-lbl">📌 Día de Cobro Mensual:</span>
+            <strong class="ss-val">Día {{ prestamoSeleccionado()?.dia_pago_mes }}</strong>
+            <small class="ss-sub">Con ajuste fin de mes (28/29 feb, 30)</small>
+          </div>
+          <div class="ss-item">
+            <span class="ss-lbl">✅ Meses Pagados:</span>
+            <strong class="ss-val text-success">{{ prestamoSeleccionado()?.meses_pagados }} meses</strong>
+            <small class="ss-sub">S/ {{ prestamoSeleccionado()?.monto_pagado | number:'1.2-2' }} cobrado</small>
+          </div>
+          <div class="ss-item" *ngIf="prestamoSeleccionado()?.estado !== 'PAGADO'">
+            <span class="ss-lbl">⏳ Próximo Cobro:</span>
+            <strong class="ss-val text-accent">{{ prestamoSeleccionado()?.fecha_proximo_pago | date:'dd/MM/yyyy' }}</strong>
+            <small class="ss-sub">{{ prestamoSeleccionado()?.modalidad === 'A_MESES' ? 'Cuota: S/ ' + (prestamoSeleccionado()?.cuota_mensual | number:'1.2-2') : 'Interés: S/ ' + (prestamoSeleccionado()?.interes_mensual_estimado | number:'1.2-2') }}</small>
+          </div>
+        </div>
+
+        <div class="schedule-list" *ngIf="prestamoSeleccionado()?.cronograma_meses as lista">
+          <div 
+            *ngFor="let m of lista" 
+            class="schedule-row-item" 
+            [ngClass]="'row-' + m.estado.toLowerCase()">
+            <div class="sr-left">
+              <div class="sr-badge" [ngClass]="'badge-' + m.estado.toLowerCase()">
+                <span class="sr-icon">{{ m.estado === 'PAGADO' ? '✅' : (m.estado === 'VENCIDO' ? '🔴' : (m.estado === 'POR_COBRAR' ? '⏳' : '📅')) }}</span>
+                <span>{{ m.estado === 'PAGADO' ? 'PAGADO' : (m.estado === 'VENCIDO' ? 'VENCIDO' : (m.estado === 'POR_COBRAR' ? 'POR COBRAR' : 'PROGRAMADO')) }}</span>
+              </div>
+              <div class="sr-info">
+                <h5 class="sr-month">{{ m.mes_nombre }}</h5>
+                <span class="sr-due">Fecha de cobro: <strong>{{ m.fecha_cobro | date:'dd/MM/yyyy' }}</strong></span>
+                <span *ngIf="m.fecha_pago" class="sr-paid-date">
+                  🕒 Pagado el {{ m.fecha_pago | date:'dd/MM/yyyy, hh:mm a' }}
+                </span>
+                <p *ngIf="m.detalle_pago" class="sr-detail">{{ m.detalle_pago }}</p>
+              </div>
+            </div>
+
+            <div class="sr-right">
+              <span class="sr-amount">S/ {{ m.monto | number:'1.2-2' }}</span>
+              <div class="sr-btns-row">
+                <button 
+                  *ngIf="(m.estado === 'POR_COBRAR' || m.estado === 'VENCIDO') && prestamoSeleccionado()?.estado !== 'PAGADO'" 
+                  class="btn-quick-pay"
+                  (click)="prestamoSeleccionado()?.modalidad === 'A_MESES' ? abrirModalCuota(prestamoSeleccionado()!) : abrirModalInteres(prestamoSeleccionado()!)">
+                  Cobrar
+                </button>
+                <button 
+                  type="button" 
+                  class="btn-wsp-row"
+                  (click)="abrirModalWhatsApp(prestamoSeleccionado()!, m.estado === 'PAGADO' ? 'COMPROBANTE' : (m.estado === 'VENCIDO' ? 'VENCIDO' : 'RECORDATORIO'))"
+                  [title]="m.estado === 'PAGADO' ? 'Enviar recibo por WhatsApp' : (m.estado === 'VENCIDO' ? 'Avisar cuota vencida' : 'Recordar cobro')">
+                  💬 WhatsApp
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer class="am-footer am-footer-between">
+        <button class="btn-delete-archive-modal" (click)="eliminar(prestamoSeleccionado()!)">
+          🗑️ Eliminar Préstamo
+        </button>
+        <button class="btn-cancel" (click)="cerrarModalesAccion()">Cerrar</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- 7. MODAL DE ERROR ELEGANTE (Cero alert() del navegador) -->
+  <div class="action-modal-backdrop" *ngIf="mensajeError()" (click)="mensajeError.set(null)">
+    <div class="action-modal-card error-card" (click)="$event.stopPropagation()">
+      <header class="am-header">
+        <div class="historial-title">
+          <h4 style="color: #f87171;">⚠️ Atención</h4>
+          <small>No se pudo completar la operación</small>
+        </div>
+        <button class="am-close" (click)="mensajeError.set(null)">✕</button>
+      </header>
+      <div class="am-body">
+        <p class="am-desc" style="color: #f1f5f9;">{{ mensajeError() }}</p>
+      </div>
+      <footer class="am-footer">
+        <button class="btn-cancel" (click)="mensajeError.set(null)">Cerrar</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- 8. MODAL DE MENSAJES DE WHATSAPP CON LAS 3 OPCIONES -->
+  <app-whatsapp-modal
+    *ngIf="modalWhatsAppActivo() && prestamoSeleccionado()"
+    [prestamo]="prestamoSeleccionado()!"
+    [tipoInicial]="tipoWhatsApp()"
+    (cerrar)="cerrarModalWhatsApp()">
+  </app-whatsapp-modal>
+
+</div>

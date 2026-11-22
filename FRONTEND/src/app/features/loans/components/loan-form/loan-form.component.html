@@ -1,0 +1,261 @@
+<div class="modal-backdrop" (click)="cerrar.emit()">
+  <div class="modal-card" (click)="$event.stopPropagation()">
+    <div class="drag-handle"></div>
+
+    <header class="sheet-header">
+      <div class="header-title-box">
+        <h3>📝 Anotar Nuevo Préstamo</h3>
+        <p class="subtitle">Registra a la persona y define el plan de cobro</p>
+      </div>
+      <button class="btn-sheet-close" (click)="cerrar.emit()" title="Cerrar">✕</button>
+    </header>
+
+    <form (ngSubmit)="guardar()" class="sheet-form">
+      <!-- Persona -->
+      <div class="form-group">
+        <label for="cliente">¿A quién le prestas? <span class="required">*</span></label>
+        <input id="cliente" type="text" [(ngModel)]="form.cliente" name="cliente" placeholder="Nombre de la persona"
+          autocomplete="off" required>
+      </div>
+
+      <!-- Teléfono / WhatsApp Opcional -->
+      <div class="form-group">
+        <div class="label-with-hint">
+          <label for="telefono">Teléfono / WhatsApp</label>
+          <span class="hint-badge">Opcional</span>
+        </div>
+        <div class="input-with-icon">
+          <span class="field-icon">📱</span>
+          <input id="telefono" type="tel" [(ngModel)]="form.telefono" name="telefono" placeholder="Ej: 987654321">
+        </div>
+      </div>
+
+      <!-- Fecha del Préstamo y Calendario Adaptado -->
+      <div class="form-group">
+        <div class="label-with-hint">
+          <label for="fechaPrestamo">Fecha de Entrega del Préstamo <span class="required">*</span></label>
+          <span class="hint-badge date-cycle-badge">Día {{ obtenerDiaPago() }} de cada mes</span>
+        </div>
+        <div class="input-with-icon">
+          <span class="field-icon">📅</span>
+          <input id="fechaPrestamo" type="date" [(ngModel)]="form.fecha_prestamo" name="fechaPrestamo" class="date-input-field" required>
+        </div>
+      </div>
+
+      <!-- Monto y % Interés -->
+      <div class="form-row">
+        <!-- Monto con Stepper Personalizado -->
+        <div class="form-group">
+          <label for="monto">Monto (S/) <span class="required">*</span></label>
+          <div class="stepper-box">
+            <button type="button" class="step-btn" (click)="cambiarMonto(-50)" title="Disminuir S/ 50">
+              <span class="step-symbol">−</span>
+            </button>
+            <div class="step-input-wrap">
+              <span class="step-prefix">S/</span>
+              <input id="monto" type="number" [(ngModel)]="form.monto_prestado" name="monto" placeholder="100.00"
+                min="1" step="50" class="clean-number-input input-pad-prefix" required>
+            </div>
+            <button type="button" class="step-btn" (click)="cambiarMonto(50)" title="Aumentar S/ 50">
+              <span class="step-symbol">+</span>
+            </button>
+          </div>
+          <!-- Sugerencias: 100, 200, 500, 1000 -->
+          <div class="quick-tags">
+            <button type="button" class="q-tag" [class.active-tag]="form.monto_prestado === 100"
+              (click)="setMonto(100)">S/ 100</button>
+            <button type="button" class="q-tag" [class.active-tag]="form.monto_prestado === 200"
+              (click)="setMonto(200)">S/ 200</button>
+            <button type="button" class="q-tag" [class.active-tag]="form.monto_prestado === 500"
+              (click)="setMonto(500)">S/ 500</button>
+            <button type="button" class="q-tag" [class.active-tag]="form.monto_prestado === 1000"
+              (click)="setMonto(1000)">S/ 1000</button>
+          </div>
+        </div>
+
+        <!-- % Interés con Stepper Personalizado -->
+        <div class="form-group">
+          <label for="interes">% Interés Mensual <span class="required">*</span></label>
+          <div class="stepper-box">
+            <button type="button" class="step-btn" (click)="cambiarInteres(-1)" title="Disminuir 1%">
+              <span class="step-symbol">−</span>
+            </button>
+            <div class="step-input-wrap">
+              <input id="interes" type="number" [(ngModel)]="form.interes_porcentaje" name="interes" placeholder="10"
+                min="0" max="100" step="0.5" class="clean-number-input input-pad-suffix" required>
+              <span class="step-suffix">%</span>
+            </div>
+            <button type="button" class="step-btn" (click)="cambiarInteres(1)" title="Aumentar 1%">
+              <span class="step-symbol">+</span>
+            </button>
+          </div>
+          <!-- Sugerencias: 1%, 3%, 5%, 10% -->
+          <div class="quick-tags">
+            <button type="button" class="q-tag" [class.active-tag]="form.interes_porcentaje === 1"
+              (click)="setInteres(1)">1%</button>
+            <button type="button" class="q-tag" [class.active-tag]="form.interes_porcentaje === 3"
+              (click)="setInteres(3)">3%</button>
+            <button type="button" class="q-tag" [class.active-tag]="form.interes_porcentaje === 5"
+              (click)="setInteres(5)">5%</button>
+            <button type="button" class="q-tag" [class.active-tag]="form.interes_porcentaje === 10"
+              (click)="setInteres(10)">10%</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Selector de Modalidad -->
+      <div class="form-group">
+        <label>Modalidad de Cobro <span class="required">*</span></label>
+        <div class="modality-selector">
+          <div class="modality-card" [class.selected]="form.modalidad === 'MENSUAL_LIBRE'"
+            (click)="form.modalidad = 'MENSUAL_LIBRE'">
+            <div class="modality-radio">
+              <span class="radio-dot" *ngIf="form.modalidad === 'MENSUAL_LIBRE'"></span>
+            </div>
+            <div class="modality-info">
+              <strong>📅 Interés Mensual</strong>
+              <small>Paga el interés pactado cada mes de forma continua hasta devolver el capital.</small>
+            </div>
+          </div>
+
+          <div class="modality-card" [class.selected]="form.modalidad === 'A_MESES'"
+            (click)="form.modalidad = 'A_MESES'">
+            <div class="modality-radio">
+              <span class="radio-dot" *ngIf="form.modalidad === 'A_MESES'"></span>
+            </div>
+            <div class="modality-info">
+              <strong>🗓️ A Cuotas Fijas (Meses)</strong>
+              <small>Plazo fijo en meses. Paga (Capital + Intereses) dividido en cuotas iguales.</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Selección de Meses con Stepper Elegante -->
+      <div class="form-group slide-in" *ngIf="form.modalidad === 'A_MESES'">
+        <label for="plazoMeses">¿En cuántos meses pagará? <span class="required">*</span></label>
+        <div class="stepper-box">
+          <button type="button" class="step-btn" (click)="cambiarMeses(-1)" title="Disminuir un mes">
+            <span class="step-symbol">−</span>
+          </button>
+          <div class="step-input-wrap">
+            <input id="plazoMeses" type="number" [(ngModel)]="form.plazo_meses" name="plazoMeses" placeholder="3"
+              min="1" max="60" step="1" class="clean-number-input input-pad-suffix-wide" required>
+            <span class="step-suffix">meses</span>
+          </div>
+          <button type="button" class="step-btn" (click)="cambiarMeses(1)" title="Aumentar un mes">
+            <span class="step-symbol">+</span>
+          </button>
+        </div>
+        <div class="quick-tags">
+          <button type="button" class="q-tag" [class.active-tag]="form.plazo_meses === 1" (click)="setMeses(1)">1
+            mes</button>
+          <button type="button" class="q-tag" [class.active-tag]="form.plazo_meses === 2" (click)="setMeses(2)">2
+            meses</button>
+          <button type="button" class="q-tag" [class.active-tag]="form.plazo_meses === 3" (click)="setMeses(3)">3
+            meses</button>
+          <button type="button" class="q-tag" [class.active-tag]="form.plazo_meses === 6" (click)="setMeses(6)">6
+            meses</button>
+          <button type="button" class="q-tag" [class.active-tag]="form.plazo_meses === 12" (click)="setMeses(12)">1
+            año</button>
+        </div>
+      </div>
+
+      <!-- Resumen de Cálculo en Vivo -->
+      <div class="live-summary" *ngIf="form.monto_prestado > 0">
+        <div class="summary-header">
+          <span class="badge-plan">
+            {{ form.modalidad === 'MENSUAL_LIBRE' ? 'Plan: Interés Mensual' : ('Plan a ' + (form.plazo_meses || 1) + ' Meses') }}
+          </span>
+          <span class="summary-interest-rate">{{ form.interes_porcentaje }}% mensual</span>
+        </div>
+
+        <!-- Fechas del ciclo programado -->
+        <div class="summary-calendar-schedule">
+          <div class="schedule-pill">
+            <span class="sch-lbl">📅 Entrega:</span>
+            <span class="sch-val">{{ form.fecha_prestamo }}</span>
+          </div>
+          <span class="sch-arrow">➔</span>
+          <div class="schedule-pill highlight-due">
+            <span class="sch-lbl">⏳ 1er Cobro:</span>
+            <span class="sch-val">{{ calcularProximoCobro() }}</span>
+          </div>
+        </div>
+
+        <!-- Caso MENSUAL_LIBRE -->
+        <div *ngIf="form.modalidad === 'MENSUAL_LIBRE'" class="summary-details">
+          <div class="summary-row main-highlight">
+            <span>Interés a cobrar cada mes:</span>
+            <strong class="cuota-amount">S/ {{ calcularInteresMensual() | number:'1.2-2' }}</strong>
+          </div>
+          <div class="summary-row sub-row">
+            <span>Capital a devolver al final:</span>
+            <span>S/ {{ form.monto_prestado | number:'1.2-2' }}</span>
+          </div>
+          <p class="summary-explanation">
+            💡 Cada mes cobrarás <strong>S/ {{ calcularInteresMensual() | number:'1.2-2' }}</strong> de interés hasta
+            que te devuelva el capital.
+          </p>
+        </div>
+
+        <!-- Caso A_MESES -->
+        <div *ngIf="form.modalidad === 'A_MESES'" class="summary-details">
+          <div class="summary-row main-highlight">
+            <span>Cuota a pagar cada mes:</span>
+            <strong class="cuota-amount">S/ {{ calcularCuotaMensual() | number:'1.2-2' }} / mes</strong>
+          </div>
+          <div class="summary-grid-2">
+            <div class="sub-col">
+              <span class="sub-lbl">Capital prestado:</span>
+              <span class="sub-val">S/ {{ form.monto_prestado | number:'1.2-2' }}</span>
+            </div>
+            <div class="sub-col">
+              <span class="sub-lbl">Interés total ({{ form.plazo_meses || 1 }} meses):</span>
+              <span class="sub-val text-accent">+S/ {{ calcularInteresTotalMeses() | number:'1.2-2' }}</span>
+            </div>
+          </div>
+          <div class="summary-row total-row">
+            <span>Total a cobrar al finalizar:</span>
+            <span class="total-bold">S/ {{ calcularTotalMeses() | number:'1.2-2' }}</span>
+          </div>
+          <p class="summary-explanation">
+            💡 {{ form.plazo_meses || 1 }} cuotas mensuales de <strong>S/ {{ calcularCuotaMensual() | number:'1.2-2'
+              }}</strong> (Total: S/ {{ calcularTotalMeses() | number:'1.2-2' }}).
+          </p>
+        </div>
+      </div>
+
+      <div class="sheet-actions">
+        <button type="button" class="btn-cancel" (click)="cerrar.emit()">Cancelar</button>
+        <button type="submit" class="btn-submit" [disabled]="guardando() || !esValido()">
+          {{ guardando() ? 'Guardando...' : 'Anotar Préstamo' }}
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- MODAL DE ERROR ELEGANTE -->
+  <div class="error-modal-backdrop" *ngIf="mensajeError()" (click)="mensajeError.set(null)">
+    <div class="error-modal-card" (click)="$event.stopPropagation()">
+      <header class="err-header">
+        <div class="err-title-row">
+          <span class="err-badge-icon">⚠️</span>
+          <h4>No se pudo guardar el préstamo</h4>
+        </div>
+        <button class="err-close" (click)="mensajeError.set(null)">✕</button>
+      </header>
+      <div class="err-body">
+        <p class="err-msg">{{ mensajeError() }}</p>
+        <div class="err-help-box">
+          <span class="err-help-title">💡 ¿Qué puedes hacer?</span>
+          <p>Verifica que el servidor backend esté encendido (puerto 8000) y que los datos ingresados sean correctos.
+          </p>
+        </div>
+      </div>
+      <footer class="err-footer">
+        <button class="err-btn-ok" (click)="mensajeError.set(null)">Entendido</button>
+      </footer>
+    </div>
+  </div>
+</div>

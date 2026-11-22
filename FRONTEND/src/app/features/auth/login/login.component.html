@@ -1,0 +1,109 @@
+<div class="auth-page-container">
+  <div class="auth-glow-bg"></div>
+
+  <div class="auth-card">
+    <!-- Header de la App -->
+    <header class="auth-header">
+      <div class="brand-box">
+        <span class="brand-icon">💰</span>
+        <h1 class="brand-title">ANOTAO</h1>
+      </div>
+      <p class="auth-subtitle">
+        {{ esRegistro() ? 'Crea tu cuenta privada para gestionar tus préstamos' : 'Tu cartera de préstamos e intereses, 100% segura' }}
+      </p>
+    </header>
+
+    <!-- Selector de Modo (Pestañas) -->
+    <div class="auth-tabs">
+      <button 
+        type="button" 
+        class="auth-tab-btn" 
+        [class.active]="!esRegistro()" 
+        (click)="esRegistro.set(false)">
+        🔑 Iniciar Sesión
+      </button>
+      <button 
+        type="button" 
+        class="auth-tab-btn" 
+        [class.active]="esRegistro()" 
+        (click)="esRegistro.set(true)">
+        ✨ Crear Cuenta
+      </button>
+    </div>
+
+    <!-- Alerta de Error -->
+    <div *ngIf="errorMensaje()" class="auth-alert error-alert">
+      <span class="alert-icon">⚠️</span>
+      <span class="alert-text">{{ errorMensaje() }}</span>
+    </div>
+
+    <!-- Formulario -->
+    <form (ngSubmit)="onSubmit()" class="auth-form">
+      <!-- Nombre (solo en registro) -->
+      <div class="form-group" *ngIf="esRegistro()">
+        <label for="nombre">Tu Nombre o Apodo <span class="req">*</span></label>
+        <div class="input-wrap">
+          <span class="input-icon">👤</span>
+          <input 
+            id="nombre" 
+            type="text" 
+            [(ngModel)]="form.nombre" 
+            name="nombre" 
+            placeholder="Ej: Juan Pérez" 
+            autocomplete="name"
+            required>
+        </div>
+      </div>
+
+      <!-- Email -->
+      <div class="form-group">
+        <label for="email">Correo Electrónico <span class="req">*</span></label>
+        <div class="input-wrap">
+          <span class="input-icon">✉️</span>
+          <input 
+            id="email" 
+            type="email" 
+            [(ngModel)]="form.email" 
+            name="email" 
+            placeholder="tu-correo@ejemplo.com" 
+            autocomplete="email"
+            required>
+        </div>
+      </div>
+
+      <!-- Contraseña -->
+      <div class="form-group">
+        <label for="password">Contraseña <span class="req">*</span></label>
+        <div class="input-wrap">
+          <span class="input-icon">🔒</span>
+          <input 
+            id="password" 
+            type="password" 
+            [(ngModel)]="form.password" 
+            name="password" 
+            placeholder="••••••••" 
+            autocomplete="current-password"
+            required>
+        </div>
+        <small class="field-hint" *ngIf="esRegistro()">Mínimo 4 caracteres</small>
+      </div>
+
+      <!-- Botón de Envío -->
+      <button type="submit" class="btn-auth-submit" [disabled]="cargando()">
+        <span *ngIf="!cargando()">
+          {{ esRegistro() ? '✨ Registrarme y Empezar' : '🚀 Entrar a mi Cartera' }}
+        </span>
+        <span *ngIf="cargando()" class="loading-state">
+          <span class="spinner-sm"></span> Procesando...
+        </span>
+      </button>
+    </form>
+
+    <!-- Footer Informativo -->
+    <footer class="auth-footer">
+      <div class="privacy-notice">
+        <span>🔒 <strong>Privacidad Garantizada:</strong> Cada usuario tiene su propia base de clientes y préstamos totalmente privada. Ningún otro usuario podrá ver tus registros.</span>
+      </div>
+    </footer>
+  </div>
+</div>
