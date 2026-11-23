@@ -56,8 +56,10 @@ export class LoanService {
     }
   }
 
-  cargarPrestamos(estado: string = 'PENDIENTE'): Observable<Prestamo[]> {
-    this.cargando.set(true);
+  cargarPrestamos(estado: string = 'PENDIENTE', silencioso: boolean = false): Observable<Prestamo[]> {
+    if (!silencioso && this.prestamos().length === 0) {
+      this.cargando.set(true);
+    }
     this.error.set(null);
 
     // Si no hay internet, devolver los préstamos locales de inmediato
@@ -154,7 +156,7 @@ export class LoanService {
     return this.http.post<Prestamo>(this.apiUrl, datos).pipe(
       tap((creado) => {
         this.offlineDb.guardarPrestamoIndividual(creado);
-        this.cargarPrestamos('PENDIENTE').subscribe();
+        this.cargarPrestamos('PENDIENTE', true).subscribe();
         this.cargarResumen().subscribe();
       }),
       catchError((err: HttpErrorResponse) => {
@@ -235,7 +237,8 @@ export class LoanService {
     return this.http.post<Prestamo>(`${this.apiUrl}/${id}/pagar-interes`, body).pipe(
       tap((actualizado) => {
         this.offlineDb.guardarPrestamoIndividual(actualizado);
-        this.cargarPrestamos('PENDIENTE').subscribe();
+        this.actualizarPrestamoEnMemoria(actualizado);
+        this.cargarPrestamos('PENDIENTE', true).subscribe();
         this.cargarResumen().subscribe();
       }),
       catchError((err: HttpErrorResponse) => {
@@ -292,7 +295,8 @@ export class LoanService {
     return this.http.post<Prestamo>(`${this.apiUrl}/${id}/pagar-cuota`, {}).pipe(
       tap((actualizado) => {
         this.offlineDb.guardarPrestamoIndividual(actualizado);
-        this.cargarPrestamos('PENDIENTE').subscribe();
+        this.actualizarPrestamoEnMemoria(actualizado);
+        this.cargarPrestamos('PENDIENTE', true).subscribe();
         this.cargarResumen().subscribe();
       }),
       catchError((err: HttpErrorResponse) => {
@@ -352,7 +356,8 @@ export class LoanService {
     return this.http.post<Prestamo>(`${this.apiUrl}/${id}/ampliar`, body).pipe(
       tap((actualizado) => {
         this.offlineDb.guardarPrestamoIndividual(actualizado);
-        this.cargarPrestamos('PENDIENTE').subscribe();
+        this.actualizarPrestamoEnMemoria(actualizado);
+        this.cargarPrestamos('PENDIENTE', true).subscribe();
         this.cargarResumen().subscribe();
       }),
       catchError((err: HttpErrorResponse) => {
@@ -409,7 +414,8 @@ export class LoanService {
     return this.http.post<Prestamo>(`${this.apiUrl}/${id}/abono`, body).pipe(
       tap((actualizado) => {
         this.offlineDb.guardarPrestamoIndividual(actualizado);
-        this.cargarPrestamos('PENDIENTE').subscribe();
+        this.actualizarPrestamoEnMemoria(actualizado);
+        this.cargarPrestamos('PENDIENTE', true).subscribe();
         this.cargarResumen().subscribe();
       }),
       catchError((err: HttpErrorResponse) => {
@@ -469,7 +475,8 @@ export class LoanService {
     return this.http.put<Prestamo>(`${this.apiUrl}/${id}/pagar-todo`, {}).pipe(
       tap((actualizado) => {
         this.offlineDb.guardarPrestamoIndividual(actualizado);
-        this.cargarPrestamos('PENDIENTE').subscribe();
+        this.actualizarPrestamoEnMemoria(actualizado);
+        this.cargarPrestamos('PENDIENTE', true).subscribe();
         this.cargarResumen().subscribe();
       }),
       catchError((err: HttpErrorResponse) => {
@@ -516,6 +523,21 @@ export class LoanService {
     return actualizado;
   }
 
+  private actualizarPrestamoEnMemoria(actualizado: Prestamo) {
+    const list = this.prestamos();
+    const idx = list.findIndex(p => p.id === actualizado.id);
+    if (idx !== -1) {
+      const copia = [...list];
+      copia[idx] = actualizado;
+      this.prestamos.set(copia);
+    }
+  }
+
+  private removerPrestamoEnMemoria(id: number) {
+    const list = this.prestamos();
+    this.prestamos.set(list.filter(p => p.id !== id));
+  }
+
   eliminarPrestamo(id: number): Observable<any> {
     if (!this.syncService.isOnline() || id < 0) {
       return from(this.eliminarPrestamoOffline(id));
@@ -524,7 +546,8 @@ export class LoanService {
     return this.http.delete(`${this.apiUrl}/${id}`).pipe(
       tap(async () => {
         await this.offlineDb.eliminarPrestamoLocal(id);
-        this.cargarPrestamos('PENDIENTE').subscribe();
+        this.removerPrestamoEnMemoria(id);
+        this.cargarPrestamos('PENDIENTE', true).subscribe();
         this.cargarResumen().subscribe();
       }),
       catchError((err: HttpErrorResponse) => {

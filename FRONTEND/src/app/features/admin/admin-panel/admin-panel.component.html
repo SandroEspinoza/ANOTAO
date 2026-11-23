@@ -1,0 +1,267 @@
+<div class="admin-modal-backdrop" (click)="cerrar.emit()">
+  <div class="admin-modal-card" (click)="$event.stopPropagation()">
+    <!-- Header del Panel -->
+    <header class="admin-header">
+      <div class="header-info">
+        <div class="admin-tag">🛡️ MODO SUPERADMINISTRADOR</div>
+        <h2>Panel de Usuarios y Suscripciones</h2>
+        <p class="header-desc">Controla qué usuarios tienen acceso activo al sistema y gestiona sus cuentas</p>
+      </div>
+      <button class="btn-close-modal" (click)="cerrar.emit()" title="Cerrar panel">✕</button>
+    </header>
+
+    <!-- Barra de Notificaciones -->
+    <div class="notice-bar success-bar" *ngIf="mensajeExito()">
+      ✅ {{ mensajeExito() }}
+    </div>
+    <div class="notice-bar error-bar" *ngIf="mensajeError()">
+      ⚠️ {{ mensajeError() }}
+    </div>
+
+    <!-- KPIs del Sistema -->
+    <div class="admin-kpis">
+      <div class="kpi-card">
+        <span class="kpi-lbl">👥 Total Usuarios</span>
+        <strong class="kpi-val">{{ totalUsuarios() }}</strong>
+      </div>
+      <div class="kpi-card kpi-success">
+        <span class="kpi-lbl">🟢 Suscripciones Activas</span>
+        <strong class="kpi-val">{{ activosCount() }}</strong>
+      </div>
+      <div class="kpi-card kpi-warning">
+        <span class="kpi-lbl">⏳ Pendientes de Pago</span>
+        <strong class="kpi-val">{{ inactivosCount() }}</strong>
+      </div>
+    </div>
+
+    <!-- Barra de Búsqueda y Refrescar -->
+    <div class="admin-toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input 
+          type="text" 
+          [ngModel]="busqueda()" 
+          (ngModelChange)="busqueda.set($event)"
+          placeholder="Buscar por nombre o correo electrónico..." 
+          class="admin-search-input">
+      </div>
+      <button type="button" class="btn-reload" (click)="cargarUsuarios()" [disabled]="cargando()" title="Recargar lista">
+        <span [class.spin]="cargando()">🔄</span> Actualizar
+      </button>
+    </div>
+
+    <!-- Lista de Usuarios -->
+    <div class="users-scroll-area">
+      <div *ngIf="cargando() && usuarios().length === 0" class="loading-state">
+        <div class="spinner"></div>
+        <p>Cargando usuarios registrados...</p>
+      </div>
+
+      <div *ngIf="!cargando() && usuariosFiltrados().length === 0" class="empty-state">
+        <span>👤</span>
+        <p>No se encontraron usuarios coincidentes.</p>
+      </div>
+
+      <div class="users-list" *ngIf="usuariosFiltrados().length > 0">
+        <div 
+          *ngFor="let u of usuariosFiltrados()" 
+          class="user-row-card" 
+          [ngClass]="obtenerEstadoUsuario(u).claseBorder">
+          
+          <div class="user-main-info">
+            <div class="user-avatar" [class.avatar-admin]="u.is_admin">
+              {{ u.nombre.charAt(0).toUpperCase() }}
+            </div>
+            <div class="user-text">
+              <div class="user-name-line">
+                <strong class="u-name">{{ u.nombre }}</strong>
+                
+                <!-- Badge de Estado de Suscripción o Rol -->
+                <span class="badge-plan" [ngClass]="obtenerEstadoUsuario(u).claseBadge">
+                  {{ obtenerEstadoUsuario(u).icono }} {{ obtenerEstadoUsuario(u).texto }}
+                </span>
+              </div>
+              <div class="user-meta-line">
+                <span class="u-email">{{ u.email }}</span>
+                <span class="u-dot">•</span>
+                <span class="u-date">Registrado: {{ parsearFechaLocal(u.created_at) | date:'dd/MM/yyyy, hh:mm a' }}</span>
+                <span class="u-dot" *ngIf="u.fecha_vencimiento_plan && u.plan_tipo !== 'ILIMITADO'">•</span>
+                <span class="u-expiry" *ngIf="u.fecha_vencimiento_plan && u.plan_tipo !== 'ILIMITADO'">📅 Vence: {{ parsearFechaLocal(u.fecha_vencimiento_plan) | date:'dd/MM/yyyy' }}</span>
+                <span class="u-dot" *ngIf="u.telefono">•</span>
+                <button 
+                  type="button" 
+                  class="u-phone-link" 
+                  *ngIf="u.telefono" 
+                  (click)="abrirWhatsAppUsuario(u)" 
+                  title="Enviar WhatsApp">
+                  <svg class="wsp-mini-svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
+                    <path d="M17.472 14.382c-.301-.15-1.78-.877-2.056-.976-.277-.1-.478-.15-.678.15-.2.301-.777.977-.952 1.177-.176.2-.351.226-.652.075-.301-.15-1.272-.469-2.423-1.496-.895-.798-1.5-1.783-1.675-2.084-.176-.3-.019-.463.132-.613.136-.134.301-.35.451-.526.15-.175.2-.3.301-.5.1-.2.05-.375-.025-.525-.075-.15-.677-1.633-.928-2.238-.244-.59-.493-.51-.678-.52-.176-.008-.376-.01-.577-.01-.2 0-.526.075-.802.375-.276.3-1.053 1.028-1.053 2.508 0 1.48 1.078 2.909 1.228 3.11.15.2 2.122 3.24 5.141 4.544.718.31 1.279.495 1.716.634.721.23 1.377.197 1.895.12.578-.087 1.78-.727 2.03-1.43.251-.703.251-1.306.176-1.432-.075-.125-.276-.2-.577-.35z"/>
+                    <path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.176L2 22l4.981-1.306A9.957 9.957 0 0 0 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18.2c-1.628 0-3.14-.46-4.425-1.256l-.317-.193-3.287.862.877-3.204-.212-.338A8.163 8.163 0 0 1 3.8 12c0-4.521 3.679-8.2 8.2-8.2 4.521 0 8.2 3.679 8.2 8.2 0 4.521-3.679 8.2-8.2 8.2z"/>
+                  </svg>
+                  <span>{{ u.telefono }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Métricas de Uso -->
+          <div class="user-usage-stats">
+            <div class="u-stat">
+              <span class="stat-lbl">Préstamos</span>
+              <strong class="stat-num">{{ u.prestamos_count }}</strong>
+            </div>
+            <div class="u-stat">
+              <span class="stat-lbl">Total Prestado</span>
+              <strong class="stat-num">S/ {{ u.total_prestado | number:'1.2-2' }}</strong>
+            </div>
+            <div class="u-stat">
+              <span class="stat-lbl">Total Cobrado</span>
+              <strong class="stat-num text-success">S/ {{ u.total_cobrado | number:'1.2-2' }}</strong>
+            </div>
+          </div>
+
+          <!-- Acciones de Gestión Modernizadas -->
+          <div class="user-actions-row">
+            <!-- Botón Renovar 1 Mes (mismo día cada mes) -->
+            <button 
+              type="button" 
+              class="btn-action btn-act-renew" 
+              *ngIf="!u.is_admin && u.plan_tipo !== 'ILIMITADO'"
+              (click)="renovarPlan(u, 30)"
+              title="Renovar 1 mes (mismo día de cobro el próximo mes)">
+              <span class="act-icon">➕</span>
+              <span>1 Mes</span>
+            </button>
+
+            <!-- Botón Cambiar Tipo de Plan (Ilimitado vs Mensual) -->
+            <button 
+              type="button" 
+              class="btn-action btn-act-plan" 
+              *ngIf="!u.is_admin"
+              (click)="cambiarTipoPlan(u, u.plan_tipo === 'ILIMITADO' ? 'MENSUAL' : 'ILIMITADO')"
+              [title]="u.plan_tipo === 'ILIMITADO' ? 'Cambiar a cobro mensual' : 'Eximir de pago / Acceso gratis permanente'">
+              <span class="act-icon">{{ u.plan_tipo === 'ILIMITADO' ? '📅' : '💎' }}</span>
+              <span>{{ u.plan_tipo === 'ILIMITADO' ? 'A Mensual' : 'Hacer Ilimitado' }}</span>
+            </button>
+
+            <!-- Interruptor de Suscripción -->
+            <button 
+              type="button" 
+              class="btn-action" 
+              [class.btn-act-suspend]="u.is_active"
+              [class.btn-act-activate]="!u.is_active"
+              (click)="toggleEstado(u)"
+              [disabled]="u.id === authService.currentUser()?.id"
+              [title]="u.is_active ? 'Suspender acceso a este usuario' : 'Habilitar suscripción mensual y permitir acceso'">
+              <span class="act-icon">{{ u.is_active ? '🚫' : '✅' }}</span>
+              <span>{{ u.is_active ? 'Suspender' : 'Habilitar' }}</span>
+            </button>
+
+            <!-- Cambiar Contraseña -->
+            <button 
+              type="button" 
+              class="btn-action btn-act-pass" 
+              (click)="abrirModalPassword(u)"
+              title="Asignar una nueva contraseña al usuario">
+              <span class="act-icon">🔑</span>
+              <span>Clave</span>
+            </button>
+
+            <!-- Eliminar Usuario -->
+            <button 
+              type="button" 
+              class="btn-action btn-act-del" 
+              *ngIf="u.id !== authService.currentUser()?.id"
+              (click)="confirmarEliminar(u)"
+              title="Eliminar usuario">
+              <span class="act-icon">🗑️</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="admin-footer">
+      <small>ANOTAO Suite • Modo Administrador</small>
+      <button type="button" class="btn-cancel" (click)="cerrar.emit()">Cerrar Panel</button>
+    </footer>
+  </div>
+</div>
+
+<!-- ==========================================
+     SUB-MODAL: CAMBIAR CONTRASEÑA
+     ========================================== -->
+<div class="sub-modal-backdrop" *ngIf="modalPasswordAbierto()" (click)="cerrarModalPassword()">
+  <div class="sub-modal-card" (click)="$event.stopPropagation()">
+    <header class="sm-header">
+      <h4>🔑 Cambiar Contraseña de Usuario</h4>
+      <button class="sm-close" (click)="cerrarModalPassword()">✕</button>
+    </header>
+    <div class="sm-body">
+      <p class="sm-desc">
+        Asigna una nueva contraseña a <strong>{{ usuarioParaPassword()?.nombre }}</strong> ({{ usuarioParaPassword()?.email }}):
+      </p>
+
+      <div class="form-group">
+        <label for="adminNewPass">Nueva Contraseña:</label>
+        <div class="input-wrap">
+          <input 
+            id="adminNewPass" 
+            [type]="mostrarPassword() ? 'text' : 'password'" 
+            [(ngModel)]="nuevaPasswordInput"
+            placeholder="Mínimo 4 caracteres" 
+            class="sm-input"
+            autofocus>
+        </div>
+      </div>
+
+      <div class="pass-toggle-row">
+        <label class="checkbox-label">
+          <input type="checkbox" [checked]="mostrarPassword()" (change)="mostrarPassword.set(!mostrarPassword())">
+          <span>Mostrar contraseña</span>
+        </label>
+      </div>
+    </div>
+    <footer class="sm-footer">
+      <button type="button" class="btn-cancel" (click)="cerrarModalPassword()">Cancelar</button>
+      <button 
+        type="button" 
+        class="btn-confirm-save" 
+        (click)="guardarNuevaPassword()" 
+        [disabled]="guardandoPassword()">
+        {{ guardandoPassword() ? 'Guardando...' : 'Asignar Contraseña' }}
+      </button>
+    </footer>
+  </div>
+</div>
+
+<!-- ==========================================
+     SUB-MODAL: CONFIRMAR ELIMINACIÓN
+     ========================================== -->
+<div class="sub-modal-backdrop" *ngIf="usuarioParaEliminar()" (click)="usuarioParaEliminar.set(null)">
+  <div class="sub-modal-card danger-card" (click)="$event.stopPropagation()">
+    <header class="sm-header">
+      <h4 style="color: #f87171;">⚠️ Confirmar Eliminación</h4>
+      <button class="sm-close" (click)="usuarioParaEliminar.set(null)">✕</button>
+    </header>
+    <div class="sm-body">
+      <p style="color: #cbd5e1; line-height: 1.5;">
+        ¿Estás seguro de que deseas eliminar permanentemente a <strong>{{ usuarioParaEliminar()?.nombre }}</strong> ({{ usuarioParaEliminar()?.email }})?
+      </p>
+      <p style="color: #ef4444; font-size: 0.85rem; margin-top: 0.4rem;">
+        Esta acción eliminará todos sus préstamos, cobros e historial de la base de datos de forma irreversible.
+      </p>
+    </div>
+    <footer class="sm-footer">
+      <button type="button" class="btn-cancel" (click)="usuarioParaEliminar.set(null)">Cancelar</button>
+      <button 
+        type="button" 
+        class="btn-danger-confirm" 
+        (click)="ejecutarEliminacion()" 
+        [disabled]="eliminando()">
+        {{ eliminando() ? 'Eliminando...' : 'Sí, Eliminar Usuario' }}
+      </button>
+    </footer>
+  </div>
+</div>

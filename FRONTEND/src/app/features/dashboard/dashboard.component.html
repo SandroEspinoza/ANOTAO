@@ -257,7 +257,7 @@
           <!-- Eliminar del Historial (Requisito explícito del usuario) -->
           <button 
             class="btn-delete-archive" 
-            (click)="eliminarPrestamoCancelado(p)" 
+            (click)="solicitarEliminarPrestamo(p)" 
             [title]="p.estado === 'PAGADO' ? 'Eliminar del historial ya cancelados' : 'Eliminar préstamo'">
             🗑️ Eliminar
           </button>
@@ -297,7 +297,7 @@
         </div>
       </div>
       <footer class="am-footer am-footer-between">
-        <button class="btn-delete-archive-modal" (click)="eliminarPrestamoCancelado(prestamoSeleccionado()!)">
+        <button class="btn-delete-archive-modal" (click)="solicitarEliminarPrestamo(prestamoSeleccionado()!)">
           🗑️ Eliminar Préstamo
         </button>
         <button class="btn-cancel" (click)="cerrarDetalleHistorial()">Cerrar</button>
@@ -365,7 +365,7 @@
       </div>
 
       <footer class="am-footer am-footer-between">
-        <button class="btn-delete-archive-modal" (click)="eliminarPrestamoCancelado(prestamoSeleccionado()!)">
+        <button class="btn-delete-archive-modal" (click)="solicitarEliminarPrestamo(prestamoSeleccionado()!)">
           🗑️ Eliminar Préstamo
         </button>
         <button class="btn-cancel" (click)="cerrarCronograma()">Cerrar</button>
@@ -380,4 +380,29 @@
     [tipoInicial]="tipoWhatsApp()"
     (cerrar)="cerrarModalWhatsApp()">
   </app-whatsapp-modal>
+
+  <!-- MODAL CONFIRMAR ELIMINACIÓN (Sin popup nativo del navegador) -->
+  <div class="action-modal-backdrop" *ngIf="prestamoAEliminar()" (click)="cancelarEliminarPrestamo()">
+    <div class="action-modal-card modal-confirm-card" (click)="$event.stopPropagation()">
+      <header class="am-header modal-header-danger">
+        <h4>🗑️ Eliminar Préstamo</h4>
+        <button class="am-close" (click)="cancelarEliminarPrestamo()">✕</button>
+      </header>
+      <div class="am-body confirm-modal-body">
+        <div class="confirm-modal-icon">⚠️</div>
+        <p class="am-desc confirm-modal-text">
+          ¿Estás seguro de eliminar el préstamo de <strong>{{ prestamoAEliminar()?.cliente }}</strong>?
+        </p>
+        <p class="confirm-modal-subtext">
+          Esta acción no se puede deshacer y borrará permanentemente el registro junto a sus cobros.
+        </p>
+      </div>
+      <footer class="am-footer modal-footer-actions">
+        <button type="button" class="btn-cancel" (click)="cancelarEliminarPrestamo()">Cancelar</button>
+        <button type="button" class="btn-danger-confirm" (click)="confirmarEliminarPrestamo()">
+          🗑️ Sí, Eliminar
+        </button>
+      </footer>
+    </div>
+  </div>
 </section>

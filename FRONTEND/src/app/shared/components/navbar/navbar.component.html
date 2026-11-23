@@ -59,6 +59,101 @@
         <span class="plus-symbol">+</span> Anotar Préstamo
       </button>
 
+      <!-- Botón de Notificaciones con Badge -->
+      <div class="notifications-container" *ngIf="authService.currentUser()">
+        <button 
+          type="button" 
+          class="notif-btn-trigger" 
+          (click)="toggleMenuNotificaciones($event)" 
+          [class.trigger-active]="menuNotificacionesAbierto()"
+          title="Notificaciones y avisos">
+          <span class="notif-bell-icon">🔔</span>
+          <span class="notif-badge-bubble" *ngIf="notificacionesCriticasCount() > 0">
+            {{ notificacionesCriticasCount() }}
+          </span>
+          <span class="notif-glow-dot" *ngIf="notificacionesCriticasCount() === 0 && tieneNotificaciones()"></span>
+        </button>
+
+        <!-- Dropdown de Notificaciones -->
+        <div class="notif-dropdown-card" *ngIf="menuNotificacionesAbierto()" (click)="$event.stopPropagation()">
+          <header class="notif-dd-header">
+            <div class="notif-header-title">
+              <span class="notif-hdr-icon">🔔</span>
+              <h4>Notificaciones</h4>
+            </div>
+            <span class="notif-badge-pill" *ngIf="notificacionesCriticasCount() > 0">
+              {{ notificacionesCriticasCount() }} urgente(s)
+            </span>
+          </header>
+
+          <div class="notif-dd-body">
+            <!-- 0. Alerta para Administrador: Nuevos Registros Pendientes -->
+            <div 
+              class="notif-item-card card-admin-new-user" 
+              *ngIf="esAdmin(authService.currentUser()) && usuariosPendientesCount() > 0"
+              (click)="abrirModalAdminDesdeNotif($event)">
+              <div class="notif-item-icon">⏳</div>
+              <div class="notif-item-content">
+                <div class="notif-item-header">
+                  <strong>Nuevos Registros Pendientes ({{ usuariosPendientesCount() }})</strong>
+                  <span class="badge-urgent-tag">Por Aprobar</span>
+                </div>
+                <p class="notif-item-desc">
+                  Hay {{ usuariosPendientesCount() }} cuenta(s) esperando confirmación para habilitar su suscripción de 1 mes.
+                </p>
+                <div class="pending-user-preview" *ngIf="usuariosPendientes().length > 0">
+                  <span class="pu-name">👤 {{ usuariosPendientes()[0].nombre }}</span>
+                  <span class="pu-email">({{ usuariosPendientes()[0].email }})</span>
+                </div>
+                <button type="button" class="btn-notif-action-admin">
+                  🛡️ Abrir Panel y Habilitar
+                </button>
+              </div>
+            </div>
+
+            <!-- 1. Alerta de Suscripción (Solo para usuarios de pago con plan por vencer o vencido) -->
+            <div class="notif-item-card" *ngIf="planInfo() as plan" [ngClass]="plan.clase">
+              <div class="notif-item-icon">{{ plan.icono }}</div>
+              <div class="notif-item-content">
+                <div class="notif-item-header">
+                  <strong>{{ plan.titulo }}</strong>
+                </div>
+                <p class="notif-item-desc">{{ plan.desc }}</p>
+                <button 
+                  type="button" 
+                  class="btn-notif-renew" 
+                  *ngIf="plan.mostrarRenovar" 
+                  (click)="contactarRenovacionWhatsApp()">
+                  <span>💬 Renovar por WhatsApp</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- 2. Alerta de Cobros Reales (Solo préstamos cuya fecha de cobro es hoy o anterior) -->
+            <div class="notif-item-card card-loans" *ngIf="cobrosHoyCount() > 0">
+              <div class="notif-item-icon">📅</div>
+              <div class="notif-item-content">
+                <div class="notif-item-header">
+                  <strong>Cobros Pendientes para Hoy ({{ cobrosHoyCount() }})</strong>
+                </div>
+                <ul class="notif-loans-list">
+                  <li *ngFor="let c of cobrosReales()" class="notif-loan-item">
+                    <span class="nli-name">👤 {{ c.cliente }}</span>
+                    <strong class="nli-amount">S/ {{ (c.modalidad === 'A_MESES' ? c.cuota_mensual : c.interes_mensual_estimado) | number:'1.2-2' }}</strong>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- Sin notificaciones pendientes (Todo al día) -->
+            <div class="notif-empty-state" *ngIf="!planInfo() && cobrosHoyCount() === 0 && (!esAdmin(authService.currentUser()) || usuariosPendientesCount() === 0)">
+              <span class="empty-star">✨</span>
+              <p>Todo al día. No tienes cobros pendientes ni avisos para hoy.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Botón Desplegable de Usuario -->
       <div class="user-menu-container" *ngIf="authService.currentUser() as user">
         <button 
@@ -67,7 +162,10 @@
           (click)="toggleMenuUsuario($event)" 
           [class.trigger-active]="menuUsuarioAbierto()"
           title="Menú de usuario">
-          <span class="user-avatar-chip">{{ obtenerInicial(user.nombre) }}</span>
+          <span class="user-avatar-chip" [class.avatar-vip]="esIlimitado(user)">
+            {{ obtenerInicial(user.nombre) }}
+          </span>
+          <span class="user-crown-icon" *ngIf="esIlimitado(user)" title="Plan Ilimitado">👑</span>
           <span class="user-name-text">{{ user.nombre }}</span>
           <span class="dropdown-arrow">{{ menuUsuarioAbierto() ? '▲' : '▼' }}</span>
         </button>
@@ -75,14 +173,23 @@
         <!-- Dropdown Desplegable -->
         <div class="user-dropdown-card" *ngIf="menuUsuarioAbierto()" (click)="$event.stopPropagation()">
           <div class="dropdown-header">
-            <span class="dd-avatar">{{ obtenerInicial(user.nombre) }}</span>
+            <span class="dd-avatar" [class.avatar-vip]="esIlimitado(user)">{{ obtenerInicial(user.nombre) }}</span>
             <div class="dd-user-info">
-              <strong class="dd-name">{{ user.nombre }}</strong>
+              <div class="dd-name-row">
+                <strong class="dd-name">{{ user.nombre }}</strong>
+                <span class="dd-crown" *ngIf="esIlimitado(user)" title="Plan Ilimitado">👑</span>
+              </div>
               <small class="dd-email">{{ user.email }}</small>
+              <span class="vip-plan-pill" *ngIf="esIlimitado(user)">👑 Cuenta Ilimitada</span>
             </div>
           </div>
           <div class="dropdown-divider"></div>
           <div class="dropdown-actions">
+            <!-- Opción exclusiva para Superadministrador -->
+            <button type="button" class="dd-item dd-admin" *ngIf="esAdmin(user)" (click)="abrirModalAdmin($event)">
+              <span class="dd-icon">🛡️</span>
+              <span class="dd-item-label dd-admin-label">Panel de Administración</span>
+            </button>
             <button type="button" class="dd-item" (click)="abrirModalAjustes($event)">
               <span class="dd-icon">⚙️</span>
               <span class="dd-item-label">Ajustes de Usuario</span>
@@ -134,7 +241,10 @@
     (click)="abrirModalPrestamo.emit()"
     title="Anotar nuevo préstamo">
     <div class="fab-circle">
-      <span>+</span>
+      <svg class="fab-svg-icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <line x1="5" y1="12" x2="19" y2="12"></line>
+      </svg>
     </div>
     <span class="tab-label">Anotar</span>
   </button>
@@ -286,11 +396,8 @@
         </div>
       </div>
     </div>
-
-    <footer class="am-footer">
-      <button type="button" class="btn-cancel" (click)="cerrarModalAjustes()">
-        Cerrar
-      </button>
-    </footer>
   </div>
 </div>
+
+<!-- Modal Principal del Panel de Administración -->
+<app-admin-panel *ngIf="modalAdminAbierto()" (cerrar)="cerrarModalAdmin()"></app-admin-panel>

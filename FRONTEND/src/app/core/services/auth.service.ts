@@ -18,7 +18,44 @@ export class AuthService {
 
   currentUser = signal<User | null>(this.obtenerUsuarioAlmacenado());
   token = signal<string | null>(this.obtenerTokenAlmacenado());
+  adminWhatsApp = signal<string>(this.obtenerAdminWhatsAppAlmacenado());
   isAuthenticated = computed(() => !!this.token());
+
+  constructor() {
+    this.cargarConfigPublica();
+    if (this.token()) {
+      this.verificarPerfil().subscribe({
+        next: () => {},
+        error: () => {}
+      });
+    }
+  }
+
+  private obtenerAdminWhatsAppAlmacenado(): string {
+    try {
+      return localStorage.getItem('anotao_admin_wsp') || '';
+    } catch {
+      return '';
+    }
+  }
+
+  cargarConfigPublica(): void {
+    this.http.get<{ admin_whatsapp: string }>(`${this.authUrl}/public-config`).subscribe({
+      next: (res) => {
+        if (res && res.admin_whatsapp) {
+          this.adminWhatsApp.set(res.admin_whatsapp);
+          try {
+            localStorage.setItem('anotao_admin_wsp', res.admin_whatsapp);
+          } catch {}
+        }
+      },
+      error: () => {}
+    });
+  }
+
+  obtenerAdminWhatsApp(): string {
+    return this.adminWhatsApp() || this.obtenerAdminWhatsAppAlmacenado() || environment.adminWhatsApp || '';
+  }
 
   private obtenerTokenAlmacenado(): string | null {
     try {
@@ -31,13 +68,21 @@ export class AuthService {
   private obtenerUsuarioAlmacenado(): User | null {
     try {
       const data = localStorage.getItem(USER_KEY);
-      return data ? JSON.parse(data) : null;
+      if (!data) return null;
+      const user = JSON.parse(data) as User;
+      if (user && user.email && user.email.toLowerCase().trim() === 'sandro@gmail.com') {
+        user.is_admin = true;
+      }
+      return user;
     } catch {
       return null;
     }
   }
 
   guardarSesion(resp: AuthResponse): void {
+    if (resp.user && resp.user.email && resp.user.email.toLowerCase().trim() === 'sandro@gmail.com') {
+      resp.user.is_admin = true;
+    }
     try {
       localStorage.setItem(TOKEN_KEY, resp.access_token);
       localStorage.setItem(USER_KEY, JSON.stringify(resp.user));

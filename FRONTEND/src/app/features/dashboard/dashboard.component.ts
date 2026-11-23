@@ -155,22 +155,31 @@ export class DashboardComponent implements OnInit {
     this.prestamoSeleccionado.set(null);
   }
 
-  eliminarPrestamoCancelado(p: Prestamo) {
-    const texto = p.estado === 'PAGADO' 
-      ? `¿Estás seguro de eliminar permanentemente el préstamo cancelado de ${p.cliente} del historial? Esta acción no se puede deshacer.`
-      : `¿Estás seguro de eliminar el préstamo de ${p.cliente}?`;
+  prestamoAEliminar = signal<Prestamo | null>(null);
 
-    if (confirm(texto)) {
-      this.loanService.eliminarPrestamo(p.id).subscribe({
-        next: () => {
-          this.cerrarDetalleHistorial();
-          this.cargarDatos();
-        },
-        error: (err) => {
-          console.error('Error al eliminar préstamo:', err);
-        }
-      });
-    }
+  solicitarEliminarPrestamo(p: Prestamo) {
+    this.prestamoAEliminar.set(p);
+  }
+
+  cancelarEliminarPrestamo() {
+    this.prestamoAEliminar.set(null);
+  }
+
+  confirmarEliminarPrestamo() {
+    const p = this.prestamoAEliminar();
+    if (!p) return;
+    this.loanService.eliminarPrestamo(p.id).subscribe({
+      next: () => {
+        this.prestamoAEliminar.set(null);
+        this.cerrarDetalleHistorial();
+        this.cerrarCronograma();
+        this.cargarDatos();
+      },
+      error: (err) => {
+        console.error('Error al eliminar préstamo:', err);
+        this.prestamoAEliminar.set(null);
+      }
+    });
   }
 
   formatearTipo(tipo: string): string {

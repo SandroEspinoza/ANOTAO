@@ -7,5 +7,6 @@ export const environment = {
   production: !isLocal,
   apiUrl: isLocal
     ? 'http://127.0.0.1:8000/api'
-    : 'https://anotao.onrender.com/api' // <- Aquí colocaremos la URL que nos dé Render al desplegar el backend
+    : 'https://anotao.onrender.com/api', // <- Aquí colocaremos la URL que nos dé Render al desplegar el backend
+  adminWhatsApp: '' // Se carga dinámicamente desde el Backend (.env) para proteger la privacidad en Git público
 };

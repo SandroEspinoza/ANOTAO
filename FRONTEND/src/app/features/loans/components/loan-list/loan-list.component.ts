@@ -1,9 +1,11 @@
-import { Component, EventEmitter, inject, OnInit, Output, signal } from '@angular/core';
+import { Component, EventEmitter, inject, OnInit, Output, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { LoanService } from '../../services/loan.service';
 import { Prestamo, MovimientoPrestamo } from '../../models/loan.model';
 import { WhatsappModalComponent, TipoMensajeWsp } from '../../../../shared/components/whatsapp-modal/whatsapp-modal.component';
+import { AuthService } from '../../../../core/services/auth.service';
+import { environment } from '../../../../../environments/environment';
 
 @Component({
   selector: 'app-loan-list',
@@ -14,7 +16,33 @@ import { WhatsappModalComponent, TipoMensajeWsp } from '../../../../shared/compo
 })
 export class LoanListComponent implements OnInit {
   loanService = inject(LoanService);
+  authService = inject(AuthService);
   busqueda = signal<string>('');
+
+  diasRestantesPlan = computed(() => {
+    const user = this.authService.currentUser();
+    if (!user || user.is_admin || user.plan_tipo === 'ILIMITADO' || (user.email && user.email.toLowerCase().trim() === 'sandro@gmail.com')) {
+      return 9999;
+    }
+    return user.dias_restantes_plan ?? 30;
+  });
+
+  alertaPlanExpira = computed(() => {
+    return this.diasRestantesPlan() <= 5;
+  });
+
+  contactarRenovarWhatsApp(): void {
+    let adminPhone = this.authService.obtenerAdminWhatsApp().replace(/\D/g, '');
+    if (adminPhone.length === 9 && adminPhone.startsWith('9')) {
+      adminPhone = '51' + adminPhone;
+    }
+    if (!adminPhone) return;
+    const email = this.authService.currentUser()?.email || '';
+    const txt = encodeURIComponent(
+      `Hola, soy usuario de ANOTAO (${email}) y deseo renovar mi suscripción mensual de 30 días.`
+    );
+    window.open(`https://wa.me/${adminPhone}?text=${txt}`, '_blank');
+  }
 
   @Output() abrirModal = new EventEmitter<void>();
   @Output() irAResumen = new EventEmitter<void>();
@@ -100,7 +128,7 @@ export class LoanListComponent implements OnInit {
     // Si la fecha ya venció
     if (proximo.getTime() < hoy.getTime()) {
       return {
-        texto: `Cobro Vencido (${this.formatearFechaCorta(p.fecha_proximo_pago)})`,
+        texto: `Vencido (${this.formatearFechaCorta(p.fecha_proximo_pago)})`,
         clase: 'ciclo-vencido',
         icono: '🔴'
       };
@@ -110,7 +138,7 @@ export class LoanListComponent implements OnInit {
     const diasDiferencia = Math.round((proximo.getTime() - hoy.getTime()) / (1000 * 3600 * 24));
     if (diasDiferencia > 32) {
       return {
-        texto: `Adelantado (Cubierto hasta ${this.formatearFechaCorta(p.fecha_proximo_pago)})`,
+        texto: `Adelantado (${this.formatearFechaCorta(p.fecha_proximo_pago)})`,
         clase: 'ciclo-adelantado',
         icono: '⚡'
       };
@@ -315,13 +343,22 @@ export class LoanListComponent implements OnInit {
     });
   }
 
+  abrirModalEliminar(prestamo: Prestamo) {
+    this.prestamoSeleccionado.set(prestamo);
+    this.accionActiva.set('ELIMINAR');
+  }
+
   eliminar(prestamo: Prestamo) {
-    if (confirm(`¿Deseas eliminar definitivamente el préstamo de ${prestamo.cliente}?`)) {
-      this.cerrarModalesAccion();
-      this.loanService.eliminarPrestamo(prestamo.id).subscribe({
-        error: (err) => this.mostrarError(err, 'Error al eliminar el préstamo')
-      });
-    }
+    this.abrirModalEliminar(prestamo);
+  }
+
+  confirmarEliminar() {
+    const p = this.prestamoSeleccionado();
+    if (!p) return;
+    this.cerrarModalesAccion();
+    this.loanService.eliminarPrestamo(p.id).subscribe({
+      error: (err) => this.mostrarError(err, 'Error al eliminar el préstamo')
+    });
   }
 
   formatearTipo(tipo: string): string {
